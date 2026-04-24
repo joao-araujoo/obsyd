@@ -1,48 +1,52 @@
-# Obsyd + Neon
+<p align="center">
+  <img src="./public/assets/img/obsyd-logo.svg" alt="Obsyd" width="320" />
+</p>
 
-Versão full-stack da Obsyd com persistência real em **Neon PostgreSQL**, autenticação real com senha hash, layout ajustado para desktop e celular e dados isolados por usuário.
+<p align="center">
+  Plataforma de organização financeira pessoal com autenticação real, persistência no Neon e interface dark-first.
+</p>
 
-## O que entrou nesta versão
+<p align="center">
+  <img src="https://img.shields.io/badge/status-em%20desenvolvimento-f59e0b" alt="Status do projeto" />
+  <img src="https://img.shields.io/badge/node-%3E%3D18-22c55e" alt="Node.js 18+" />
+  <img src="https://img.shields.io/badge/database-Neon%20PostgreSQL-38bdf8" alt="Neon PostgreSQL" />
+  <img src="https://img.shields.io/badge/deploy-Render-8b5cf6" alt="Deploy Render" />
+</p>
 
-- Persistência em **Neon/PostgreSQL**
-- Login e cadastro reais conectados ao banco online
-- Sessão real por token
-- Bootstrap e sincronização da SPA usando o banco
-- Sidebar corrigida e contida dentro do layout
-- Sidebar com altura máxima da tela e navegação interna rolável
-- Melhor responsividade mobile
-- Mesmas funcionalidades da versão dark refresh
+## Sobre
+
+O **Obsyd** é uma aplicação full-stack de finanças pessoais construída em Node.js, com frontend SPA servido pelo próprio backend e dados persistidos no **Neon PostgreSQL**.
+
+Hoje o projeto entrega:
+
+- autenticação real com cadastro, login e senha com hash
+- sessão por cookie HTTP-only
+- dashboard com métricas, gráfico de fluxo e agenda semanal
+- transações, metas, juros compostos, orçamentos, assinaturas, relatórios e alertas
+- categorias customizáveis e orçamento por categoria
+- persistência individual por usuário no banco
 
 ## Stack
 
-- Frontend: HTML, Tailwind via CDN, CSS customizado e JavaScript vanilla
-- Backend: Node.js puro com `http`
-- Banco: Neon PostgreSQL via `pg`
-- Gráficos: Chart.js via CDN
+- **Frontend:** HTML, Tailwind via CDN, CSS customizado e JavaScript vanilla
+- **Backend:** Node.js puro com `http`
+- **Banco:** Neon PostgreSQL via `pg`
+- **Gráficos:** Chart.js
+- **Deploy recomendado:** Render
 
 ## Estrutura
 
-- `server.js`: servidor HTTP, API, sessão e persistência no Neon
-- `package.json`: scripts e dependências
-- `public/`: SPA e assets
-- `.env.example`: modelo para sua connection string do Neon
-- `render.yaml`: deploy pronto no Render
-- `Procfile`: start simples para PaaS
-- `Dockerfile`: imagem pronta para deploy containerizado
+- [server.js](/home/joao/code/projetos/finflow-spa-dark-refresh/server.js:1): servidor HTTP, API, autenticação, sessão e persistência
+- [public/](/home/joao/code/projetos/finflow-spa-dark-refresh/public): SPA, assets, favicon e branding
+- [render.yaml](/home/joao/code/projetos/finflow-spa-dark-refresh/render.yaml:1): blueprint para deploy no Render
+- [Dockerfile](/home/joao/code/projetos/finflow-spa-dark-refresh/Dockerfile:1): imagem pronta para container
+- [Procfile](/home/joao/code/projetos/finflow-spa-dark-refresh/Procfile:1): start simples para plataformas compatíveis
 
-## Variáveis de ambiente
+```
 
-Crie sua variável `DATABASE_URL` com a connection string do Neon.
-O servidor também lê automaticamente um arquivo `.env` na raiz do projeto.
+## API principal
 
-Exemplo em `.env.example`:
-
-- `DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require`
-- `HOST=0.0.0.0`
-- `PORT=8000`
-
-## API
-
+- `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
@@ -50,52 +54,27 @@ Exemplo em `.env.example`:
 - `PUT /api/bootstrap`
 - `GET /api/health`
 
-## Login
+## Roadmap
 
-O acesso agora funciona com cadastro e login reais:
-
-- crie sua conta com nome, e-mail e senha
-- use o mesmo e-mail e senha para voltar depois
-- cada usuário começa com o ambiente zerado e salva seu próprio histórico
-
-## Rodando localmente
-
-### Requisito
-
-- Node.js 18+
-
-### Instalação
-
-- `npm install`
-- defina `DATABASE_URL`
-- `npm start`
-
-Depois abra:
-
-- `http://127.0.0.1:8000`
-
-## Deploy
-
-### Render
-
-- conecte o repositório
-- o projeto já inclui `render.yaml`
-- adicione a variável `DATABASE_URL`
-- deploye normalmente
-
-### Railway
-
-- suba o projeto
-- defina `DATABASE_URL`
-- start command: `npm start`
-
-### Docker
-
-- defina `DATABASE_URL`
-- build e execute a imagem normalmente
+- [x] Rebrand completo para Obsyd
+- [x] Autenticação real com senha hash
+- [x] Sessão com cookie HTTP-only
+- [x] Persistência 100% no banco por usuário
+- [x] Dashboard com agenda semanal
+- [x] Categorias customizáveis e orçamento por categoria
+- [x] Calendário responsivo e layout mobile refinado
+- [ ] Edição de transações existentes
+- [ ] Exclusão e edição de categorias com regras de reassociação
+- [ ] Configurações de perfil mais completas
+- [ ] Melhorias de acessibilidade e navegação por teclado
+- [ ] Pipeline de deploy e ambiente de staging
 
 ## Observações
 
-- O endpoint `/api/health` acusa erro enquanto `DATABASE_URL` não estiver configurada.
-- A aplicação continua sendo uma SPA com fallback do servidor para as rotas do frontend.
-- O banco é inicializado automaticamente no primeiro start com as tabelas necessárias.
+- O endpoint `/api/health` é o melhor lugar para validar se o deploy está de pé.
+- O Neon precisa estar configurado corretamente antes do primeiro start em produção.
+- Como a sessão usa cookie HTTP-only, não há dependência de `localStorage` para autenticação.
+
+## Autor
+
+Desenvolvido por **João Araujo**.

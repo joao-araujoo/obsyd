@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: finflow-dark-refresh-neon
+    name: obsyd
     env: node
     plan: free
     buildCommand: npm install
@@ -12,5 +12,3 @@ services:
         sync: false
       - key: HOST
         value: 0.0.0.0
-      - key: PORT
-        value: 8000
