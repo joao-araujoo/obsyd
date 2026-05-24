@@ -1,19 +1,20 @@
 const API_BASE = '';
 const BRAND_NAME = 'Obsyd';
+const finance = window.ObsydFinance;
 
 const app = document.getElementById('app');
 
 const routes = [
-  { key: 'dashboard', label: 'Dashboard', icon: '◈' },
-  { key: 'transactions', label: 'Transações', icon: '↹' },
-  { key: 'goals', label: 'Metas', icon: '◎' },
-  { key: 'calculator', label: 'Juros Compostos', icon: '∿' },
-  { key: 'calendar', label: 'Calendário', icon: '◫' },
-  { key: 'budgets', label: 'Orçamentos', icon: '▣' },
-  { key: 'subscriptions', label: 'Assinaturas', icon: '◌' },
-  { key: 'reports', label: 'Relatórios', icon: '◍' },
-  { key: 'alerts', label: 'Alertas', icon: '⚑' },
-  { key: 'backup', label: 'Backup', icon: '⬒' }
+  { key: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+  { key: 'transactions', label: 'Transações', icon: 'arrow-right-left' },
+  { key: 'goals', label: 'Metas', icon: 'piggy-bank' },
+  { key: 'calculator', label: 'Juros Compostos', icon: 'calculator' },
+  { key: 'calendar', label: 'Calendário', icon: 'calendar-days' },
+  { key: 'budgets', label: 'Orçamentos', icon: 'wallet-cards' },
+  { key: 'subscriptions', label: 'Assinaturas', icon: 'repeat-2' },
+  { key: 'reports', label: 'Relatórios', icon: 'chart-no-axes-combined' },
+  { key: 'alerts', label: 'Alertas', icon: 'bell-ring' },
+  { key: 'backup', label: 'Backup', icon: 'database-backup' }
 ];
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -28,7 +29,9 @@ let pendingSync = false;
 let ui = {
   sidebarOpen: false,
   calendarDate: new Date(),
+  selectedCalendarDate: null,
   authMode: 'login',
+  toast: null,
   viewState: {}
 };
 let charts = {
@@ -136,7 +139,9 @@ async function apiRequest(path, options = {}) {
       const errorPayload = await response.json();
       if (errorPayload?.error) message = errorPayload.error;
     } catch {}
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   if (response.status === 204) return null;
@@ -155,7 +160,9 @@ async function bootstrapSession() {
     const payload = await apiRequest('/api/bootstrap');
     state = mergeDefaults(payload.state || payload);
   } catch (error) {
-    console.warn('Falha ao restaurar a sessão:', error);
+    if (error.status !== 401) {
+      console.warn('Falha ao restaurar a sessão:', error);
+    }
     clearAuth();
     state = getDefaultState();
   } finally {
@@ -229,7 +236,8 @@ function getDefaultState(profileSource = {}) {
     },
     goal: {
       name: 'Objetivo principal',
-      target: 0
+      target: 0,
+      currentAmount: 0
     },
     calculator: {
       initialAmount: 0,
@@ -252,6 +260,7 @@ function render() {
   if (!auth.isAuthenticated) {
     app.innerHTML = renderLogin();
     bindLoginPage();
+    hydrateIcons();
     return;
   }
 
@@ -261,73 +270,140 @@ function render() {
   bindShell();
   bindRoute(route);
   postRender(route);
+  hydrateIcons();
+}
+
+function hydrateIcons() {
+  if (window.lucide?.createIcons) {
+    window.lucide.createIcons({
+      attrs: {
+        'stroke-width': 1.8
+      }
+    });
+  }
+}
+
+function icon(name, className = 'h-4 w-4') {
+  return `<i data-lucide="${name}" class="${className}" aria-hidden="true"></i>`;
 }
 
 function renderLogin() {
   const isRegister = ui.authMode === 'register';
   return `
-    <div class="min-h-screen flex items-center justify-center px-4 py-8">
-      <div class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-[1.15fr_.85fr] gap-6">
-        <section class="glass rounded-[32px] p-8 md:p-10 card-enter hidden lg:block">
-          <div class="flex items-center gap-4">
-            <img src="./assets/img/obsyd-mark.svg" alt="Logo Obsyd" class="h-14 w-14 shrink-0" />
-            <div>
-              <div class="text-3xl font-semibold tracking-tight text-slate-50">Obsyd</div>
-              <div class="text-xs uppercase tracking-[0.28em] text-slate-500">Financial Operating System</div>
+    <div class="login-screen min-h-screen px-4 py-6 sm:py-8">
+      ${renderToastRegion()}
+      <div class="login-shell mx-auto grid min-h-[calc(100dvh-3rem)] w-full max-w-6xl grid-cols-1 items-center gap-5 lg:grid-cols-[minmax(0,1.05fr)_430px]">
+        <section class="login-visual card-enter hidden h-full min-h-[620px] overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.045] p-6 lg:block">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <img src="./assets/img/obsyd-mark.svg" alt="Logo Obsyd" class="h-12 w-12 shrink-0" />
+              <div>
+                <div class="text-xl font-semibold tracking-tight text-slate-50">Obsyd</div>
+                <div class="text-[11px] uppercase tracking-[0.24em] text-slate-500">Painel financeiro</div>
+              </div>
             </div>
           </div>
-          <h1 class="mt-6 text-4xl md:text-5xl font-semibold tracking-tight leading-tight">
-            Clareza para o seu caixa, ritmo para as suas metas e uma rotina financeira que finalmente faz sentido.
-          </h1>
-          <p class="mt-4 max-w-2xl text-slate-300 text-base md:text-lg">
-            A ${BRAND_NAME} organiza suas movimentações, projeções e decisões em uma experiência direta, elegante e conectada ao seu banco Neon.
-          </p>
 
-          <div class="mt-8 grid grid-cols-1 gap-4">
-            ${renderMiniFeature('Dashboard financeiro completo', 'Acompanhe saldo, receitas, despesas, investimentos e agenda da semana em uma visão unificada.', 'emerald')}
-            ${renderMiniFeature('Gestão modular da rotina', 'Organize transações, metas, categorias, orçamentos, assinaturas, alertas e relatórios no mesmo fluxo.', 'violet')}
-            ${renderMiniFeature('Persistência real no banco', 'Cada alteração fica vinculada ao usuário e sincronizada com o Neon.', 'slate')}
+          <div class="login-private-preview mt-8 rounded-[24px] border border-white/10 bg-slate-950/30 p-5">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs uppercase tracking-[0.22em] text-slate-500">Visão privada</p>
+                <h2 class="mt-2 text-xl font-semibold tracking-tight">Seu painel financeiro sem expor valores na entrada.</h2>
+                <p class="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">Entre para ver saldos, metas, recorrências e relatórios em tempo real.</p>
+              </div>
+              <span class="feature-icon feature-icon-violet">${icon('eye-off', 'h-5 w-5')}</span>
+            </div>
+          </div>
+
+          <div class="mt-5 grid grid-cols-[1fr_240px] gap-4">
+            <article class="rounded-[24px] border border-white/10 bg-slate-950/30 p-5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.22em] text-slate-500">Fluxo mensal</p>
+                  <h2 class="mt-2 text-lg font-semibold tracking-tight">Receitas, gastos e aportes</h2>
+                </div>
+                <span class="tag tag-slate">6 meses</span>
+              </div>
+              <div class="login-bars mt-7">
+                ${[44, 62, 52, 78, 58, 86].map((height, index) => `
+                  <div class="login-bar-group" aria-hidden="true">
+                    <span class="login-bar income" style="height:${height}%"></span>
+                    <span class="login-bar expense" style="height:${Math.max(18, height - 30)}%"></span>
+                    <span class="login-bar investment" style="height:${Math.max(16, height - 42)}%"></span>
+                    <small>${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'][index]}</small>
+                  </div>
+                `).join('')}
+              </div>
+            </article>
+
+            <article class="rounded-[24px] border border-white/10 bg-slate-950/30 p-5">
+              <p class="text-xs uppercase tracking-[0.22em] text-slate-500">Agenda</p>
+              <h2 class="mt-2 text-lg font-semibold tracking-tight">Próximos sinais</h2>
+              <div class="mt-5 space-y-3">
+                ${loginSignalPreview('10', 'Transporte', 'R$ 30,00', 'rose')}
+                ${loginSignalPreview('13', 'Salário', 'R$ 2.500,00', 'emerald')}
+                ${loginSignalPreview('22', 'Alimentação', 'R$ 70,79', 'violet')}
+              </div>
+            </article>
+          </div>
+
+          <div class="mt-5 rounded-[24px] border border-white/10 bg-slate-950/30 p-5">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs uppercase tracking-[0.22em] text-slate-500">Insights</p>
+                <h2 class="mt-2 text-lg font-semibold tracking-tight">Alimentação lidera suas despesas do mês.</h2>
+                <p class="mt-2 text-sm text-slate-400">Entre para revisar categorias, orçamentos e próximos vencimentos em uma visão única.</p>
+              </div>
+              <div class="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/10 text-violet-200 xl:flex">${icon('sparkles', 'h-7 w-7')}</div>
+            </div>
           </div>
         </section>
 
-        <section class="glass rounded-[32px] p-8 md:p-10 card-enter card-enter-delay-1">
-          <div class="mb-8 flex items-center gap-4">
-            <img src="./assets/img/obsyd-mark.svg" alt="Logo Obsyd" class="h-12 w-12 shrink-0" />
-            <div>
-              <div class="text-2xl font-semibold tracking-tight text-slate-50">Obsyd</div>
-              <div class="text-xs uppercase tracking-[0.28em] text-slate-500">Acesso seguro</div>
+        <section class="login-card glass card-enter card-enter-delay-1 flex h-full min-h-[620px] flex-col rounded-[28px] p-6 sm:p-8">
+          <div class="mb-7 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <img src="./assets/img/obsyd-mark.svg" alt="Logo Obsyd" class="h-11 w-11 shrink-0" />
+              <div>
+                <div class="text-xl font-semibold tracking-tight text-slate-50">Obsyd</div>
+                <div class="text-[11px] uppercase tracking-[0.24em] text-slate-500">Acesso financeiro</div>
+              </div>
             </div>
+            <span class="tag tag-slate">${isRegister ? 'Nova conta' : 'Login'}</span>
           </div>
 
-          <div class="grid grid-cols-2 gap-2 rounded-[22px] border border-white/10 bg-slate-950/35 p-2">
+          <div class="mb-6">
+            <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">${isRegister ? 'Crie seu espaço financeiro.' : 'Bem-vindo de volta.'}</h1>
+            <p class="mt-2 text-sm leading-relaxed text-slate-400">
+              ${isRegister ? 'Configure sua conta para acompanhar caixa, metas e relatórios com persistência individual.' : 'Entre para continuar acompanhando seu painel, movimentações e decisões do mês.'}
+            </p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 rounded-[18px] border border-white/10 bg-slate-950/35 p-1.5">
             <button type="button" data-auth-mode="login" class="auth-mode-btn ${!isRegister ? 'active' : ''}">Entrar</button>
             <button type="button" data-auth-mode="register" class="auth-mode-btn ${isRegister ? 'active' : ''}">Criar conta</button>
           </div>
 
-          <div class="mt-8 flex items-center justify-between gap-3">
-            <div>
-              <p class="text-sm uppercase tracking-[0.24em] text-slate-400">${isRegister ? 'Novo acesso' : 'Acesso seguro'}</p>
-              <h2 class="mt-2 text-2xl font-semibold tracking-tight">${isRegister ? 'Criar conta na Obsyd' : 'Entrar na Obsyd'}</h2>
-            </div>
-          </div>
-
-          <form id="authForm" class="mt-8 space-y-4">
+          <form id="authForm" class="mt-7 space-y-4">
             ${isRegister ? `
               <div>
-                <label class="mb-2 block text-sm text-slate-300" for="registerName">Seu nome</label>
-                <input id="registerName" name="name" class="input-luxury" type="text" placeholder="Como devemos te chamar?" required />
+                <label class="mb-2 block text-sm text-slate-300" for="registerName">Nome</label>
+                <input id="registerName" name="name" class="input-luxury" type="text" placeholder="Seu nome" autocomplete="name" required />
               </div>
             ` : ''}
             <div>
               <label class="mb-2 block text-sm text-slate-300" for="authEmail">E-mail</label>
-              <input id="authEmail" name="email" class="input-luxury" type="email" placeholder="voce@obsyd.app" required />
+              <input id="authEmail" name="email" class="input-luxury" type="email" placeholder="voce@email.com" autocomplete="email" required />
             </div>
             <div>
               <label class="mb-2 block text-sm text-slate-300" for="authPassword">Senha</label>
-              <input id="authPassword" name="password" class="input-luxury" type="password" placeholder="••••••••" required />
+              <input id="authPassword" name="password" class="input-luxury" type="password" placeholder="Sua senha" autocomplete="${isRegister ? 'new-password' : 'current-password'}" required />
             </div>
-            <button class="btn-primary w-full" type="submit">${isRegister ? 'Criar conta e entrar' : 'Entrar agora'}</button>
+            <button class="btn-primary mt-2 w-full" type="submit">${isRegister ? 'Criar conta' : 'Entrar'}</button>
           </form>
+
+          <div class="mt-auto pt-6 text-sm leading-relaxed text-slate-500">
+            Uma área privada para acompanhar caixa, metas, recorrências e relatórios sem misturar dados entre usuários.
+          </div>
         </section>
       </div>
     </div>
@@ -349,11 +425,69 @@ function renderMiniFeature(title, description, tone) {
   `;
 }
 
+function loginMetricPreview(label, value, detail, tone) {
+  const toneClass = {
+    emerald: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
+    violet: 'border-violet-400/20 bg-violet-400/10 text-violet-200',
+    rose: 'border-rose-400/20 bg-rose-400/10 text-rose-200',
+    slate: 'border-white/10 bg-white/5 text-slate-200'
+  }[tone] || 'border-white/10 bg-white/5 text-slate-200';
+
+  return `
+    <article class="rounded-[22px] border p-4 ${toneClass}">
+      <p class="text-xs uppercase tracking-[0.18em] opacity-75">${label}</p>
+      <strong class="blurred-value mt-3 block text-2xl font-semibold tracking-tight">${value}</strong>
+      <span class="mt-2 block text-sm opacity-70">${detail}</span>
+    </article>
+  `;
+}
+
+function loginSignalPreview(day, label, value, tone) {
+  const tagClass = tone === 'emerald' ? 'tag-emerald' : tone === 'violet' ? 'tag-violet' : 'tag-rose';
+  return `
+    <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/8 text-sm font-semibold text-slate-100">${day}</span>
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-sm font-medium text-slate-100">${label}</p>
+        <p class="blurred-value mt-0.5 text-xs text-slate-500">${value}</p>
+      </div>
+      <span class="tag ${tagClass}">BRL</span>
+    </div>
+  `;
+}
+
+function renderToastRegion() {
+  const toast = ui.toast;
+  const visibleClass = toast ? 'toast-visible' : '';
+  const toneClass = toast?.type === 'success' ? 'toast-success' : toast?.type === 'info' ? 'toast-info' : 'toast-error';
+  return `
+    <div id="toastRegion" class="toast-region ${visibleClass}" role="status" aria-live="polite">
+      ${toast ? `
+        <div class="toast-card ${toneClass}">
+          <div class="toast-icon" aria-hidden="true">${toast.type === 'success' ? '✓' : toast.type === 'info' ? 'i' : '!'}</div>
+          <div class="min-w-0">
+            <p class="toast-title">${escapeHtml(toast.title || toastTitle(toast.type))}</p>
+            <p class="toast-message">${escapeHtml(toast.message || '')}</p>
+          </div>
+          <button class="toast-close" type="button" data-dismiss-toast aria-label="Fechar mensagem">${icon('x', 'h-4 w-4')}</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function toastTitle(type) {
+  if (type === 'success') return 'Tudo certo';
+  if (type === 'info') return 'Atenção';
+  return 'Não foi possível continuar';
+}
+
 function renderShell(pageTitle, content) {
   const current = getRoute();
   const headerCopy = getHeaderCopy(current, pageTitle);
   return `
     <div class="min-h-[100dvh] lg:grid lg:grid-cols-[304px_minmax(0,1fr)]">
+      ${renderToastRegion()}
       <div id="sidebarOverlay" class="${ui.sidebarOpen ? 'fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden' : 'hidden'}"></div>
 
       <aside id="sidebar" class="mobile-drawer glass-strong fixed left-2 top-2 z-50 h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-[28px] border border-white/10 px-4 py-4 shadow-glow ${ui.sidebarOpen ? 'open' : ''} lg:sticky lg:left-0 lg:top-0 lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[304px] lg:rounded-none lg:border-l-0 lg:border-t-0 lg:border-b-0 lg:px-5 lg:py-5">
@@ -366,13 +500,13 @@ function renderShell(pageTitle, content) {
                 <div class="truncate text-[11px] uppercase tracking-[0.28em] text-slate-500">Sistema financeiro pessoal</div>
               </div>
             </a>
-            <button id="closeSidebarBtn" class="btn-secondary h-11 w-11 shrink-0 p-0 lg:hidden" aria-label="Fechar menu">×</button>
+            <button id="closeSidebarBtn" class="btn-secondary h-11 w-11 shrink-0 p-0 lg:hidden" aria-label="Fechar menu">${icon('x', 'h-5 w-5')}</button>
           </div>
 
           <nav class="sidebar-nav mt-5 flex-1 space-y-2 overflow-y-auto pr-1">
             ${routes.map((route) => `
               <a href="#/${route.key}" class="sidebar-link ${current === route.key ? 'active' : ''}">
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm">${route.icon}</span>
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300">${icon(route.icon, 'h-4 w-4')}</span>
                 <span class="truncate font-medium">${route.label}</span>
               </a>
             `).join('')}
@@ -404,7 +538,7 @@ function renderShell(pageTitle, content) {
           <div class="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
             <div class="flex items-start justify-between gap-3 max-lg:items-center">
               <div class="flex min-w-0 items-center gap-3">
-                <button id="openSidebarBtn" class="btn-secondary h-11 w-11 shrink-0 p-0 lg:hidden" aria-label="Abrir menu">☰</button>
+                <button id="openSidebarBtn" class="btn-secondary h-11 w-11 shrink-0 p-0 lg:hidden" aria-label="Abrir menu">${icon('menu', 'h-5 w-5')}</button>
                 <div class="min-w-0 max-lg:hidden">
                   <p class="text-[11px] uppercase tracking-[0.28em] text-slate-500">${headerCopy.eyebrow}</p>
                   <h1 class="text-2xl font-semibold tracking-tight text-slate-50 sm:text-[2rem]">${headerCopy.title}</h1>
@@ -413,13 +547,13 @@ function renderShell(pageTitle, content) {
               </div>
               <div class="hidden xl:flex items-center gap-2 pl-4">
                 <span class="tag tag-slate">${monthLabel.format(new Date())}</span>
-                <span class="tag tag-slate">Saldo: ${currency.format(computeBalance())}</span>
+                <span class="tag tag-slate">Saldo disponível: ${currency.format(computeBalance())}</span>
                 <span class="tag tag-emerald">${getWelcomeLabel()}</span>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2 max-lg:hidden xl:hidden">
               <span class="tag tag-slate">${monthLabel.format(new Date())}</span>
-              <span class="tag tag-slate">Saldo: ${currency.format(computeBalance())}</span>
+              <span class="tag tag-slate">Saldo disponível: ${currency.format(computeBalance())}</span>
               <span class="tag tag-emerald">${getWelcomeLabel()}</span>
             </div>
           </div>
@@ -485,17 +619,19 @@ function renderPage(route) {
 }
 
 function renderDashboardPage() {
-  const monthly = getMonthlySummary(new Date());
+  const position = finance.computeFinancialPosition(state.transactions, new Date());
+  const monthly = position.monthly;
   const budgetStatus = getBudgetStatus();
-  const subscriptions = getActiveSubscriptionsTotal();
   const dueSoon = getUpcomingBills(7);
-  const savingsRate = monthly.income > 0 ? Math.max(0, ((monthly.income - monthly.expense - monthly.investment) / monthly.income) * 100) : 0;
+  const pendingSubscriptions = getPendingSubscriptions(currentPeriodKey());
+  const pendingTotal = sumAmount(pendingSubscriptions);
   const budgetPct = budgetStatus.totalLimit > 0 ? Math.min(100, (budgetStatus.totalSpent / budgetStatus.totalLimit) * 100) : 0;
   const recent = getSortedTransactions().slice(0, 6);
+  const insights = buildFinancialInsights();
 
   return `
     <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      ${metricCard('Saldo total', currency.format(computeBalance()), computeBalance() >= 0 ? 'Fluxo líquido positivo.' : 'Fluxo líquido negativo.', 'emerald', 'card-enter')}
+      ${metricCard('Saldo disponível', currency.format(position.availableBalance), 'Caixa livre: receitas menos despesas e aportes.', position.availableBalance >= 0 ? 'emerald' : 'rose', 'card-enter')}
       ${metricCard('Receitas do mês', currency.format(monthly.income), 'Entradas registradas no mês atual.', 'emerald', 'card-enter card-enter-delay-1')}
       ${metricCard('Despesas do mês', currency.format(monthly.expense), 'Saídas consumidas no mês atual.', 'rose', 'card-enter card-enter-delay-2')}
       ${metricCard('Investimentos do mês', currency.format(monthly.investment), 'Aportes destinados ao futuro.', 'violet', 'card-enter card-enter-delay-3')}
@@ -516,9 +652,11 @@ function renderDashboardPage() {
       </article>
 
       <div class="grid grid-cols-1 gap-6">
-        ${infoCard('Taxa de poupança', `${savingsRate.toFixed(1)}%`, 'Quanto da sua renda sobrou após gastos e aportes.', 'emerald')}
-        ${infoCard('Contas vencendo em 7 dias', `${dueSoon.length} item(ns)`, dueSoon.length ? `Total previsto: ${currency.format(sumAmount(dueSoon))}` : 'Nenhuma conta próxima do vencimento.', 'rose')}
-        ${infoCard('Assinaturas ativas', currency.format(subscriptions), 'Custo mensal consolidado de serviços recorrentes.', 'violet')}
+        ${infoCard('Taxa de poupança', `${monthly.savingsRate.toFixed(1)}%`, 'Regra: (receitas - despesas) / receitas.', 'emerald')}
+        ${infoCard('Saldo líquido mensal', currency.format(monthly.netCashFlow), 'Receitas menos despesas e investimentos.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
+        ${infoCard('Patrimônio financeiro', currency.format(position.netWorth), 'Saldo disponível + total aportado em investimentos.', 'violet')}
+        ${infoCard('Contas vencendo em 7 dias', `${dueSoon.length} item(ns)`, dueSoon.length ? `Pendente previsto: ${currency.format(sumAmount(dueSoon))}` : 'Nenhuma conta próxima do vencimento.', 'rose')}
+        ${infoCard('Assinaturas pendentes', currency.format(pendingTotal), `${pendingSubscriptions.length} obrigação(ões) ainda não realizadas.`, pendingTotal ? 'rose' : 'emerald')}
         <article class="glass rounded-[28px] p-5 hover-lift">
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -535,6 +673,19 @@ function renderDashboardPage() {
             <span>Limites: ${currency.format(budgetStatus.totalLimit)}</span>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section class="mt-6 glass rounded-[30px] p-5 sm:p-6 hover-lift">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-xl font-semibold tracking-tight">Insights financeiros</h2>
+          <p class="mt-1 text-sm text-slate-400">Leituras automáticas com a mesma regra usada nos relatórios.</p>
+        </div>
+        <a href="#/reports" class="btn-secondary">Ver relatórios</a>
+      </div>
+      <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        ${insights.map(renderInsightCard).join('')}
       </div>
     </section>
 
@@ -608,6 +759,23 @@ function infoCard(title, value, subtitle, tone) {
   `;
 }
 
+function renderInsightCard(insight) {
+  const toneClass = {
+    success: 'tag-emerald',
+    danger: 'tag-rose',
+    info: 'tag-violet',
+    neutral: 'tag-slate'
+  }[insight.tone] || 'tag-slate';
+
+  return `
+    <article class="rounded-[24px] border border-white/10 bg-white/5 p-4">
+      <span class="tag ${toneClass}">${escapeHtml(insight.label)}</span>
+      <h3 class="mt-3 text-base font-semibold tracking-tight">${escapeHtml(insight.title)}</h3>
+      <p class="mt-2 text-sm leading-relaxed text-slate-400">${escapeHtml(insight.description)}</p>
+    </article>
+  `;
+}
+
 function renderCategoryOptions(categories, currentValue) {
   const unique = [...new Set(categories.filter(Boolean))];
   const safeCurrent = unique.includes(currentValue) || currentValue === '__custom__'
@@ -640,7 +808,7 @@ function renderDashboardWeekCalendar() {
 }
 
 function renderDashboardWeekDay(day) {
-  const items = getScheduleItemsForDate(day.date);
+  const items = getCalendarItemsForDate(day.date);
   return `
     <article class="mini-calendar-day rounded-[24px] border border-white/10 bg-white/5 p-4 ${day.isToday ? 'today' : ''}">
       <div class="flex items-center justify-between gap-2">
@@ -675,132 +843,145 @@ function renderTransactionsPage() {
     search: valueOf('searchTransaction', ''),
     month: valueOf('filterMonth', localISO(new Date()).slice(0, 7))
   });
+  const monthly = getMonthlySummary(parseLocalDate(`${valueOf('filterMonth', localISO(new Date()).slice(0, 7))}-01`));
 
   return `
-    <section class="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-      <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-        <div>
-          <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Nova movimentação</p>
-          <h2 class="mt-2 text-2xl font-semibold tracking-tight">Adicionar transação</h2>
-        </div>
+    <section class="space-y-6">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        ${metricCard('Receitas filtradas', currency.format(monthly.income), 'Entradas no mês selecionado.', 'emerald')}
+        ${metricCard('Despesas filtradas', currency.format(monthly.expense), 'Saídas consumidas no mês.', 'rose')}
+        ${metricCard('Investimentos', currency.format(monthly.investment), 'Aportes registrados.', 'violet')}
+        ${metricCard('Saldo líquido', currency.format(monthly.netCashFlow), 'Receitas - despesas - aportes.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
+      </div>
 
-        <form id="transactionForm" class="mt-6 space-y-4">
-          <div>
-            <label class="mb-2 block text-sm text-slate-300">Descrição</label>
-            <input class="input-luxury" name="description" required placeholder="Ex.: Compra no mercado" />
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <section class="grid grid-cols-1 gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
+        <article class="glass rounded-[28px] p-5 sm:p-6">
+          <div class="flex items-start gap-3">
+            <span class="feature-icon feature-icon-violet">${icon('plus', 'h-5 w-5')}</span>
             <div>
-              <label class="mb-2 block text-sm text-slate-300">Valor</label>
-              <input class="input-luxury" name="amount" type="number" min="0" step="0.01" required placeholder="0,00" />
-            </div>
-            <div>
-              <label class="mb-2 block text-sm text-slate-300">Data</label>
-              <input class="input-luxury" name="date" type="date" value="${localISO(new Date())}" required />
+              <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Nova movimentação</p>
+              <h2 class="mt-2 text-xl font-semibold tracking-tight">Adicionar transação</h2>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form id="transactionForm" class="mt-6 space-y-4">
             <div>
-              <label class="mb-2 block text-sm text-slate-300">Tipo</label>
-              <div class="select-wrap">
-                <select class="select-luxury" name="type">
-                  <option value="income">Receita</option>
-                  <option value="expense" selected>Despesa</option>
-                  <option value="investment">Investimento</option>
-                </select>
+              <label class="mb-2 block text-sm text-slate-300">Descrição</label>
+              <input class="input-luxury" name="description" required placeholder="Ex.: Compra no mercado" autocomplete="off" />
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Valor</label>
+                <div class="money-input-wrap">
+                  <span>R$</span>
+                  <input class="input-luxury money-input" name="amount" inputmode="decimal" required placeholder="0,00" />
+                </div>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Data</label>
+                <input class="input-luxury" name="date" type="date" value="${localISO(new Date())}" required />
               </div>
             </div>
-            <div>
-              <label class="mb-2 block text-sm text-slate-300">Categoria</label>
-              <div class="select-wrap">
-                <select class="select-luxury" id="transactionCategory" name="category">
-                  ${renderCategoryOptions(categories, selectedCategory)}
-                </select>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Tipo</label>
+                <div class="select-wrap">
+                  <select class="select-luxury" name="type">
+                    <option value="income">Receita</option>
+                    <option value="expense" selected>Despesa</option>
+                    <option value="investment">Investimento</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Categoria</label>
+                <div class="select-wrap">
+                  <select class="select-luxury" id="transactionCategory" name="category">
+                    ${renderCategoryOptions(categories, selectedCategory)}
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div id="transactionCustomCategoryWrap" class="${isCustomCategory ? '' : 'hidden'}">
-            <label class="mb-2 block text-sm text-slate-300">Nova categoria</label>
-            <input class="input-luxury" id="transactionCustomCategory" name="customCategory" placeholder="Ex.: Pets, Viagem, Casa" ${isCustomCategory ? 'required' : ''} />
-          </div>
-
-          <label class="inline-flex items-center gap-3 text-sm text-slate-300">
-            <input name="recurring" type="checkbox" class="h-4 w-4 rounded border-white/20 bg-slate-900/60" />
-            Marcar como recorrente
-          </label>
-
-          <button class="btn-primary w-full" type="submit">Salvar transação</button>
-        </form>
-      </article>
-
-      <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift min-w-0">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Gestão inteligente</p>
-            <h2 class="mt-2 text-2xl font-semibold tracking-tight">Lista de transações</h2>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 w-full lg:w-auto">
-            <input id="searchTransaction" class="input-luxury md:min-w-[210px]" value="${escapeHtml(valueOf('searchTransaction', ''))}" placeholder="Buscar descrição..." />
-            <div class="select-wrap">
-              <select id="filterType" class="select-luxury">
-                ${selectOptions([
-                  ['all', 'Todos os tipos'],
-                  ['income', 'Receitas'],
-                  ['expense', 'Despesas'],
-                  ['investment', 'Investimentos']
-                ], valueOf('filterType', 'all'))}
-              </select>
+            <div id="transactionCustomCategoryWrap" class="${isCustomCategory ? '' : 'hidden'}">
+              <label class="mb-2 block text-sm text-slate-300">Nova categoria</label>
+              <input class="input-luxury" id="transactionCustomCategory" name="customCategory" placeholder="Ex.: Pets, Viagem, Casa" ${isCustomCategory ? 'required' : ''} />
             </div>
-            <div class="select-wrap">
-              <select id="filterRecurring" class="select-luxury">
-                ${selectOptions([
-                  ['all', 'Todas'],
-                  ['recurring', 'Recorrentes'],
-                  ['single', 'Pontuais']
-                ], valueOf('filterRecurring', 'all'))}
-              </select>
+
+            <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+              <input name="recurring" type="checkbox" class="h-4 w-4 rounded border-white/20 bg-slate-900/60" />
+              Marcar como recorrente
+            </label>
+
+            <button class="btn-primary w-full" type="submit">${icon('save', 'h-4 w-4')} Salvar transação</button>
+          </form>
+        </article>
+
+        <article class="glass rounded-[28px] p-5 sm:p-6 min-w-0">
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Gestão inteligente</p>
+                <h2 class="mt-2 text-xl font-semibold tracking-tight">Lista de transações</h2>
+              </div>
+              <button id="exportTransactionsCsvBtn" class="btn-secondary w-full sm:w-auto" type="button">${icon('download', 'h-4 w-4')} Exportar CSV</button>
             </div>
-            <input id="filterMonth" class="input-luxury" type="month" value="${valueOf('filterMonth', localISO(new Date()).slice(0, 7))}" />
+
+            <div class="transaction-toolbar">
+              <div class="toolbar-search">
+                ${icon('search', 'h-4 w-4')}
+                <input id="searchTransaction" value="${escapeHtml(valueOf('searchTransaction', ''))}" placeholder="Buscar descrição, categoria..." />
+              </div>
+              <div class="select-wrap">
+                <select id="filterType" class="select-luxury">
+                  ${selectOptions([
+                    ['all', 'Todos os tipos'],
+                    ['income', 'Receitas'],
+                    ['expense', 'Despesas'],
+                    ['investment', 'Investimentos']
+                  ], valueOf('filterType', 'all'))}
+                </select>
+              </div>
+              <div class="select-wrap">
+                <select id="filterRecurring" class="select-luxury">
+                  ${selectOptions([
+                    ['all', 'Todas'],
+                    ['recurring', 'Recorrentes'],
+                    ['single', 'Pontuais']
+                  ], valueOf('filterRecurring', 'all'))}
+                </select>
+              </div>
+              <input id="filterMonth" class="input-luxury" type="month" value="${valueOf('filterMonth', localISO(new Date()).slice(0, 7))}" />
+            </div>
+          </div>
+
+          <div class="transaction-card-list mt-5 space-y-3 md:hidden">
+            ${transactions.length ? transactions.map(renderTransactionCard).join('') : emptyState('Nenhuma transação encontrada para os filtros atuais.')}
+          </div>
+
+          <div class="transaction-table-wrap mt-5 overflow-hidden rounded-[22px] border border-white/10 bg-slate-950/25 max-md:hidden">
+            <div class="table-scroll overflow-auto">
+              <table class="min-w-full text-sm professional-table">
+                <thead class="text-left text-slate-400">
+                  <tr>
+                    <th class="px-4 py-3 font-medium">Descrição</th>
+                    <th class="px-4 py-3 font-medium">Categoria</th>
+                    <th class="px-4 py-3 font-medium">Data</th>
+                    <th class="px-4 py-3 font-medium">Tipo</th>
+                    <th class="px-4 py-3 font-medium text-right">Valor</th>
+                    <th class="px-4 py-3 font-medium text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${transactions.length ? transactions.map(renderTransactionRow).join('') : `<tr><td colspan="6" class="px-4 py-12 text-center text-slate-400">Nenhuma transação encontrada para os filtros atuais.</td></tr>`}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-
-        <div class="mt-6 rounded-[24px] border border-white/10 bg-slate-950/25 p-3 table-scroll overflow-auto">
-          <table class="min-w-full text-sm">
-            <thead class="text-left text-slate-400">
-              <tr>
-                <th class="px-3 py-3 font-medium">Descrição</th>
-                <th class="px-3 py-3 font-medium">Categoria</th>
-                <th class="px-3 py-3 font-medium">Data</th>
-                <th class="px-3 py-3 font-medium">Tipo</th>
-                <th class="px-3 py-3 font-medium text-right">Valor</th>
-                <th class="px-3 py-3 font-medium text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${transactions.length ? transactions.map((tx) => `
-                <tr class="border-t border-white/6">
-                  <td class="px-3 py-4">
-                    <div class="font-medium">${escapeHtml(tx.description)}</div>
-                    <div class="mt-1 text-xs text-slate-500">${tx.recurring ? 'Recorrente' : 'Pontual'}</div>
-                  </td>
-                  <td class="px-3 py-4 text-slate-300">${escapeHtml(tx.category)}</td>
-                  <td class="px-3 py-4 text-slate-300">${formatDate(tx.date)}</td>
-                  <td class="px-3 py-4">${typeBadge(tx.type)}</td>
-                  <td class="px-3 py-4 text-right font-semibold ${tx.type === 'income' ? 'text-emerald-300' : tx.type === 'investment' ? 'text-violet-300' : 'text-rose-300'}">
-                    ${currency.format(tx.amount)}
-                  </td>
-                  <td class="px-3 py-4 text-right">
-                    <button class="btn-danger px-3 py-2 text-xs" data-delete-transaction="${tx.id}">Excluir</button>
-                  </td>
-                </tr>
-              `).join('') : `<tr><td colspan="6" class="px-3 py-10 text-center text-slate-400">Nenhuma transação encontrada para os filtros atuais.</td></tr>`}
-            </tbody>
-          </table>
-        </div>
-      </article>
+        </article>
+      </section>
     </section>
   `;
 }
@@ -809,11 +990,14 @@ function renderGoalsPage() {
   const goal = getGoalProgress();
 
   return `
-    <section class="grid grid-cols-1 gap-6 xl:grid-cols-[460px_minmax(0,1fr)]">
-      <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-        <div>
-          <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Meta principal</p>
-          <h2 class="mt-2 text-2xl font-semibold tracking-tight">Atualizar objetivo</h2>
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <article class="glass rounded-[28px] p-5 sm:p-6">
+        <div class="flex items-start gap-3">
+          <span class="feature-icon feature-icon-emerald">${icon('piggy-bank', 'h-5 w-5')}</span>
+          <div>
+            <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Cofrinho da meta</p>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight">Configurar meta</h2>
+          </div>
         </div>
 
         <form id="goalForm" class="mt-6 space-y-4">
@@ -823,19 +1007,40 @@ function renderGoalsPage() {
           </div>
           <div>
             <label class="mb-2 block text-sm text-slate-300">Valor alvo</label>
-            <input class="input-luxury" name="goalTarget" type="number" min="0" step="0.01" value="${state.goal.target}" placeholder="50000" />
+            <div class="money-input-wrap">
+              <span>R$</span>
+              <input class="input-luxury money-input" name="goalTarget" inputmode="decimal" value="${state.goal.target || ''}" placeholder="0,00" />
+            </div>
           </div>
-          <button class="btn-primary w-full" type="submit">Salvar meta</button>
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Valor guardado</label>
+            <div class="money-input-wrap">
+              <span>R$</span>
+              <input class="input-luxury money-input" name="goalCurrentAmount" inputmode="decimal" value="${state.goal.currentAmount || ''}" placeholder="0,00" />
+            </div>
+          </div>
+          <button class="btn-primary w-full" type="submit">${icon('save', 'h-4 w-4')} Salvar cofrinho</button>
+        </form>
+
+        <form id="goalContributionForm" class="mt-5 rounded-[22px] border border-white/10 bg-white/5 p-4">
+          <label class="mb-2 block text-sm text-slate-300">Adicionar aporte ao cofrinho</label>
+          <div class="flex gap-2">
+            <div class="money-input-wrap flex-1">
+              <span>R$</span>
+              <input class="input-luxury money-input" name="goalContribution" inputmode="decimal" placeholder="0,00" />
+            </div>
+            <button class="btn-secondary shrink-0" type="submit" aria-label="Adicionar aporte">${icon('plus', 'h-4 w-4')}</button>
+          </div>
         </form>
       </article>
 
       <div class="grid gap-6">
-        <article class="glass rounded-[30px] p-6 hover-lift">
+        <article class="glass rounded-[28px] p-6">
           <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Progresso automático</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Progresso independente</p>
               <h2 class="mt-2 text-2xl font-semibold tracking-tight">${escapeHtml(state.goal.name)}</h2>
-              <p class="mt-2 text-sm text-slate-400">A barra usa seu saldo líquido disponível como aproximação de avanço da meta.</p>
+              <p class="mt-2 text-sm text-slate-400">Esse cofrinho não usa seu saldo real automaticamente. Você controla o valor guardado.</p>
             </div>
             <span class="tag ${goal.progress >= 100 ? 'tag-emerald' : 'tag-violet'}">${goal.progress.toFixed(1)}%</span>
           </div>
@@ -846,8 +1051,8 @@ function renderGoalsPage() {
 
           <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
             <div class="rounded-[22px] border border-white/10 bg-white/5 p-4">
-              <p class="text-slate-400">Saldo disponível</p>
-              <p class="mt-2 text-xl font-semibold">${currency.format(goal.balance)}</p>
+              <p class="text-slate-400">Guardado no cofrinho</p>
+              <p class="mt-2 text-xl font-semibold">${currency.format(goal.currentAmount)}</p>
             </div>
             <div class="rounded-[22px] border border-white/10 bg-white/5 p-4">
               <p class="text-slate-400">Valor alvo</p>
@@ -860,7 +1065,7 @@ function renderGoalsPage() {
           </div>
         </article>
 
-        <article class="glass rounded-[30px] p-6 hover-lift">
+        <article class="glass rounded-[28px] p-6">
           <div class="flex items-center justify-between gap-3">
             <div>
               <h3 class="text-xl font-semibold tracking-tight">Estratégia sugerida</h3>
@@ -869,8 +1074,8 @@ function renderGoalsPage() {
           </div>
           <div class="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="rounded-[22px] border border-white/10 bg-white/5 p-4">
-              <p class="text-slate-400">Aporte mensal médio</p>
-              <p class="mt-2 text-xl font-semibold">${currency.format(getAverageMonthlyInvestment())}</p>
+              <p class="text-slate-400">Percentual restante</p>
+              <p class="mt-2 text-xl font-semibold">${Math.max(0, 100 - goal.progress).toFixed(1)}%</p>
             </div>
             <div class="rounded-[22px] border border-white/10 bg-white/5 p-4">
               <p class="text-slate-400">Meses estimados</p>
@@ -878,7 +1083,7 @@ function renderGoalsPage() {
             </div>
             <div class="rounded-[22px] border border-white/10 bg-white/5 p-4">
               <p class="text-slate-400">Próximo passo</p>
-              <p class="mt-2 text-base font-medium">${goal.progress >= 100 ? 'Meta já alcançada' : 'Manter disciplina e revisar orçamento'}</p>
+              <p class="mt-2 text-base font-medium">${goal.progress >= 100 ? 'Meta já alcançada' : 'Adicionar aportes recorrentes ao cofrinho'}</p>
             </div>
           </div>
         </article>
@@ -905,20 +1110,20 @@ function renderCalculatorPage() {
         <form id="calculatorForm" class="mt-6 space-y-4">
           <div>
             <label class="mb-2 block text-sm text-slate-300">Capital inicial</label>
-            <input class="input-luxury" name="initialAmount" type="number" min="0" step="0.01" value="${state.calculator.initialAmount}" />
+            <input class="input-luxury" name="initialAmount" type="number" min="0" step="0.01" inputmode="decimal" value="${state.calculator.initialAmount}" />
           </div>
           <div>
             <label class="mb-2 block text-sm text-slate-300">Aporte mensal</label>
-            <input class="input-luxury" name="monthlyContribution" type="number" min="0" step="0.01" value="${state.calculator.monthlyContribution}" />
+            <input class="input-luxury" name="monthlyContribution" type="number" min="0" step="0.01" inputmode="decimal" value="${state.calculator.monthlyContribution}" />
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="mb-2 block text-sm text-slate-300">Taxa anual (%)</label>
-              <input class="input-luxury" name="annualRate" type="number" min="0" step="0.01" value="${state.calculator.annualRate}" />
+              <input class="input-luxury" name="annualRate" type="number" min="0" step="0.01" inputmode="decimal" value="${state.calculator.annualRate}" />
             </div>
             <div>
               <label class="mb-2 block text-sm text-slate-300">Anos</label>
-              <input class="input-luxury" name="years" type="number" min="1" step="1" value="${state.calculator.years}" />
+              <input class="input-luxury" name="years" type="number" min="1" step="1" inputmode="numeric" value="${state.calculator.years}" />
             </div>
           </div>
           <button class="btn-primary w-full" type="submit">Projetar cenário</button>
@@ -967,6 +1172,7 @@ function renderCalendarPage() {
   const label = monthLabel.format(date).replace(/^\w/, (match) => match.toUpperCase());
   const grid = buildCalendar(date);
   const mobileAgenda = buildCalendarMobileAgenda(date);
+  const selected = ui.selectedCalendarDate ? renderCalendarDayDetails(ui.selectedCalendarDate) : '';
 
   return `
     <section class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
@@ -977,9 +1183,9 @@ function renderCalendarPage() {
           <p class="mt-1 text-sm text-slate-400">Inclui recorrências, despesas pontuais e assinaturas ativas.</p>
         </div>
         <div class="flex items-center gap-3">
-          <button id="prevCalendarBtn" class="btn-secondary">←</button>
+          <button id="prevCalendarBtn" class="btn-secondary" aria-label="Mês anterior">${icon('chevron-left', 'h-4 w-4')}</button>
           <span class="min-w-[180px] text-center text-sm font-medium text-slate-200">${label}</span>
-          <button id="nextCalendarBtn" class="btn-secondary">→</button>
+          <button id="nextCalendarBtn" class="btn-secondary" aria-label="Próximo mês">${icon('chevron-right', 'h-4 w-4')}</button>
         </div>
       </div>
 
@@ -998,6 +1204,8 @@ function renderCalendarPage() {
           </div>
         </div>
       </div>
+
+      ${selected}
     </section>
   `;
 }
@@ -1021,16 +1229,18 @@ function buildCalendar(baseDate) {
     const today = new Date();
     const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
 
+    const dateIso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
     cells.push(`
-      <article class="calendar-day glass rounded-[24px] p-3">
+      <article class="calendar-day glass rounded-[24px] p-3 ${ui.selectedCalendarDate === dateIso ? 'selected' : ''}" data-calendar-day="${dateIso}" tabindex="0" role="button" aria-label="Abrir detalhes do dia ${day}">
         <div class="flex items-center justify-between gap-2">
           <span class="flex h-8 w-8 items-center justify-center rounded-xl ${isToday ? 'bg-violet-500/25 text-violet-200' : 'bg-white/5 text-slate-200'}">${day}</span>
-          ${items.length ? `<span class="tag ${isPeak ? 'tag-rose' : 'tag-slate'}">${currency.format(amount)}</span>` : ''}
+          ${items.length ? `<span class="tag ${isPeak ? 'tag-rose' : 'tag-slate'}">${currency.format(getCalendarSummary(items).realized)}</span>` : ''}
         </div>
 
         <div class="mt-3 space-y-2 text-xs">
           ${items.slice(0, 3).map((item) => `
-            <div class="rounded-2xl border border-white/10 bg-white/5 px-2.5 py-2">
+            <div class="rounded-2xl border px-2.5 py-2 ${scheduleToneClass(item.tone)}">
               <div class="truncate font-medium">${escapeHtml(item.title)}</div>
               <div class="mt-1 flex items-center justify-between gap-2 text-slate-400">
                 <span class="truncate">${escapeHtml(item.category || item.typeLabel || 'Agenda')}</span>
@@ -1047,6 +1257,39 @@ function buildCalendar(baseDate) {
   return cells;
 }
 
+function renderCalendarDayDetails(dateIso) {
+  const date = parseLocalDate(dateIso);
+  const items = getCalendarItemsForDate(date);
+  const summary = getCalendarSummary(items);
+  return `
+    <aside class="mt-6 rounded-[28px] border border-white/10 bg-slate-950/35 p-5">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Detalhe do dia</p>
+          <h3 class="mt-2 text-xl font-semibold tracking-tight">${formatDate(dateIso)}</h3>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="tag tag-emerald">Realizado: ${currency.format(summary.realized)}</span>
+          <span class="tag ${summary.pending ? 'tag-rose' : 'tag-slate'}">Pendente: ${currency.format(summary.pending)}</span>
+        </div>
+      </div>
+      <div class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        ${items.length ? items.map((item) => `
+          <div class="rounded-[22px] border p-4 ${scheduleToneClass(item.tone)}">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate font-semibold text-slate-100">${escapeHtml(item.title)}</p>
+                <p class="mt-1 text-sm text-slate-400">${escapeHtml(item.category || item.typeLabel || 'Agenda')} • ${escapeHtml(item.typeLabel || '')}</p>
+              </div>
+              <strong class="shrink-0 text-sm">${currency.format(item.amount)}</strong>
+            </div>
+          </div>
+        `).join('') : emptyState('Nenhuma movimentação ou vencimento neste dia.')}
+      </div>
+    </aside>
+  `;
+}
+
 function buildCalendarMobileAgenda(baseDate) {
   const year = baseDate.getFullYear();
   const month = baseDate.getMonth();
@@ -1056,11 +1299,12 @@ function buildCalendarMobileAgenda(baseDate) {
 
   for (let day = 1; day <= totalDays; day += 1) {
     const date = new Date(year, month, day);
-    const dayItems = getScheduleItemsForDate(date);
+    const dayItems = getCalendarItemsForDate(date);
+    const summary = getCalendarSummary(dayItems);
     const isToday = localISO(date) === todayIso;
 
     items.push(`
-      <article class="rounded-[22px] border border-white/10 bg-white/5 p-4 ${isToday ? 'ring-1 ring-violet-400/40' : ''}">
+      <article class="rounded-[22px] border border-white/10 bg-white/5 p-4 ${isToday ? 'ring-1 ring-violet-400/40' : ''}" data-calendar-day="${localISO(date)}" tabindex="0" role="button" aria-label="Abrir detalhes de ${formatDate(localISO(date))}">
         <div class="flex items-center justify-between gap-3">
           <div>
             <p class="text-xs uppercase tracking-[0.22em] text-slate-500">${date.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
@@ -1068,9 +1312,15 @@ function buildCalendarMobileAgenda(baseDate) {
           </div>
           ${dayItems.length ? `<span class="tag tag-slate">${dayItems.length} item(ns)</span>` : ''}
         </div>
+        ${dayItems.length ? `
+          <div class="mt-3 flex flex-wrap gap-2">
+            <span class="tag tag-emerald">Realizado ${currency.format(summary.realized)}</span>
+            <span class="tag ${summary.pending ? 'tag-rose' : 'tag-slate'}">Pendente ${currency.format(summary.pending)}</span>
+          </div>
+        ` : ''}
         <div class="mt-4 space-y-2 text-sm">
           ${dayItems.length ? dayItems.slice(0, 4).map((item) => `
-            <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-3 py-2">
+            <div class="rounded-2xl border px-3 py-2 ${scheduleToneClass(item.tone)}">
               <div class="truncate font-medium text-slate-100">${escapeHtml(item.title)}</div>
               <div class="mt-1 flex items-center justify-between gap-2 text-xs text-slate-400">
                 <span class="truncate">${escapeHtml(item.category || item.typeLabel || 'Agenda')}</span>
@@ -1115,7 +1365,7 @@ function renderBudgetsPage() {
           </div>
           <div>
             <label class="mb-2 block text-sm text-slate-300">Limite mensal</label>
-            <input class="input-luxury" name="limit" type="number" min="0" step="0.01" placeholder="0,00" required />
+            <input class="input-luxury" name="limit" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00" required />
           </div>
           <button class="btn-primary w-full" type="submit">Salvar orçamento</button>
         </form>
@@ -1165,6 +1415,7 @@ function renderBudgetRow(budget) {
 
 function renderSubscriptionsPage() {
   const total = getActiveSubscriptionsTotal();
+  const pending = getPendingSubscriptions(currentPeriodKey());
   const categories = getAvailableCategories();
   const selectedCategory = valueOf('draftSubscriptionCategory', 'Assinaturas');
   const isCustomCategory = selectedCategory === '__custom__';
@@ -1185,11 +1436,11 @@ function renderSubscriptionsPage() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="mb-2 block text-sm text-slate-300">Valor mensal</label>
-              <input class="input-luxury" name="amount" type="number" min="0" step="0.01" required />
+              <input class="input-luxury" name="amount" type="number" min="0" step="0.01" inputmode="decimal" required />
             </div>
             <div>
               <label class="mb-2 block text-sm text-slate-300">Dia de cobrança</label>
-              <input class="input-luxury" name="dueDay" type="number" min="1" max="31" required />
+              <input class="input-luxury" name="dueDay" type="number" min="1" max="31" inputmode="numeric" required />
             </div>
           </div>
           <div>
@@ -1214,7 +1465,10 @@ function renderSubscriptionsPage() {
             <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Custos recorrentes</p>
             <h2 class="mt-2 text-2xl font-semibold tracking-tight">Assinaturas ativas</h2>
           </div>
-          <span class="tag tag-violet">${currency.format(total)}/mês</span>
+          <div class="flex flex-wrap gap-2">
+            <span class="tag tag-violet">${currency.format(total)}/mês</span>
+            <span class="tag ${pending.length ? 'tag-rose' : 'tag-emerald'}">${pending.length} pendente(s)</span>
+          </div>
         </div>
 
         <div class="mt-6 space-y-4">
@@ -1227,27 +1481,59 @@ function renderSubscriptionsPage() {
 
 function renderSubscriptionRow(subscription) {
   const nextCharge = getNextChargeDate(subscription.dueDay);
+  const period = currentPeriodKey();
+  const payment = getSubscriptionPayment(subscription, period);
+  const status = finance.getSubscriptionStatus(subscription, period, localISO(new Date()));
+  const isPaid = status === 'paid';
+  const statusMeta = getSubscriptionStatusMeta(status);
+  const dueDate = finance.getSubscriptionDueDate(subscription, period);
+  const paymentInputId = `paymentDate-${subscription.id}`;
   return `
-    <div class="rounded-[24px] border border-white/10 bg-white/5 p-4">
+    <div class="rounded-[24px] border ${statusMeta.cardClass} p-4">
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div class="flex items-center gap-3">
-            <h3 class="text-lg font-semibold tracking-tight">${escapeHtml(subscription.name)}</h3>
-            <span class="tag ${subscription.active ? 'tag-emerald' : 'tag-slate'}">${subscription.active ? 'Ativa' : 'Pausada'}</span>
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="category-icon ${statusMeta.iconClass}">${icon(statusMeta.icon, 'h-4 w-4')}</span>
+            <h3 class="min-w-0 break-words text-lg font-semibold tracking-tight">${escapeHtml(subscription.name)}</h3>
+            <span class="tag ${statusMeta.tagClass}">${statusMeta.label}</span>
           </div>
           <p class="mt-1 text-sm text-slate-400">
-            ${currency.format(subscription.amount)} • vence dia ${subscription.dueDay} • próxima cobrança em ${nextCharge}
+            ${currency.format(subscription.amount)} • ${escapeHtml(subscription.category || 'Assinaturas')} • vence em ${dueDate ? formatDate(dueDate) : `dia ${subscription.dueDay}`} • próxima cobrança em ${nextCharge}
+            ${payment ? ` • pago em ${formatDate(payment.paidAt)}` : ''}
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="btn-secondary px-3 py-2 text-xs" data-toggle-subscription="${subscription.id}">
-            ${subscription.active ? 'Pausar' : 'Ativar'}
+        <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center md:justify-end">
+          ${isPaid ? `
+            <button class="btn-secondary min-h-11 px-3 py-2 text-sm" data-unpay-subscription="${subscription.id}">
+              ${icon('undo-2', 'h-3.5 w-3.5')} Desfazer
+            </button>
+          ` : status === 'paused' ? '' : `
+            <input class="input-luxury subscription-payment-date" id="${paymentInputId}" type="date" value="${localISO(new Date())}" aria-label="Data de pagamento de ${escapeHtml(subscription.name)}" />
+            <button class="btn-success min-h-11 px-3 py-2 text-sm" data-pay-subscription="${subscription.id}" data-payment-input="${paymentInputId}">
+              ${icon('check', 'h-3.5 w-3.5')} Marcar pago
+            </button>
+          `}
+          <button class="btn-secondary min-h-11 px-3 py-2 text-sm" data-toggle-subscription="${subscription.id}">
+            ${icon(subscription.active ? 'pause' : 'play', 'h-3.5 w-3.5')} ${subscription.active ? 'Pausar' : 'Ativar'}
           </button>
-          <button class="btn-danger px-3 py-2 text-xs" data-delete-subscription="${subscription.id}">Excluir</button>
+          <button class="btn-danger h-11 w-11 p-0" data-delete-subscription="${subscription.id}" aria-label="Excluir assinatura">${icon('trash-2', 'h-4 w-4')}</button>
         </div>
       </div>
     </div>
   `;
+}
+
+function getSubscriptionStatusMeta(status) {
+  if (status === 'paid') {
+    return { label: 'Paga', icon: 'circle-check', tagClass: 'tag-emerald', iconClass: 'category-icon-emerald', cardClass: 'border-emerald-400/20 bg-emerald-400/10' };
+  }
+  if (status === 'paused') {
+    return { label: 'Pausada', icon: 'pause-circle', tagClass: 'tag-slate', iconClass: 'category-icon-violet', cardClass: 'border-white/10 bg-white/5' };
+  }
+  if (status === 'overdue') {
+    return { label: 'Atrasada', icon: 'circle-alert', tagClass: 'tag-rose', iconClass: 'category-icon-rose', cardClass: 'border-rose-400/25 bg-rose-400/12' };
+  }
+  return { label: 'Pendente', icon: 'clock-3', tagClass: 'tag-violet', iconClass: 'category-icon-violet', cardClass: 'border-violet-400/20 bg-violet-400/10' };
 }
 
 function renderReportsPage() {
@@ -1382,6 +1668,67 @@ function renderTransactionListItem(tx) {
   `;
 }
 
+function renderTransactionRow(tx) {
+  const typeMeta = getTypeMeta(tx.type);
+  return `
+    <tr class="border-t border-white/6">
+      <td class="px-4 py-4">
+        <div class="flex items-center gap-3">
+          <span class="category-icon ${typeMeta.iconClass}">${icon(typeMeta.icon, 'h-4 w-4')}</span>
+          <div class="min-w-0">
+            <div class="truncate font-semibold text-slate-100">${escapeHtml(tx.description)}</div>
+            <div class="mt-1 flex items-center gap-2 text-xs text-slate-500">
+              ${icon(tx.recurring ? 'repeat-2' : 'dot', 'h-3.5 w-3.5')}
+              <span>${tx.recurring ? 'Recorrente' : 'Pontual'}</span>
+            </div>
+          </div>
+        </div>
+      </td>
+      <td class="px-4 py-4">${categoryBadge(tx.category)}</td>
+      <td class="px-4 py-4 text-slate-300">${formatDate(tx.date)}</td>
+      <td class="px-4 py-4">${typeBadge(tx.type)}</td>
+      <td class="px-4 py-4 text-right font-semibold ${typeMeta.textClass}">
+        ${currency.format(tx.amount)}
+      </td>
+      <td class="px-4 py-4 text-right">
+        <button class="btn-danger h-9 w-9 p-0" data-delete-transaction="${tx.id}" aria-label="Excluir transação" title="Excluir">
+          ${icon('trash-2', 'h-4 w-4')}
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
+function renderTransactionCard(tx) {
+  const typeMeta = getTypeMeta(tx.type);
+  return `
+    <article class="transaction-card ${tx.type} rounded-[22px] border p-4">
+      <div class="flex items-start gap-3">
+        <span class="category-icon ${typeMeta.iconClass}">${icon(typeMeta.icon, 'h-4 w-4')}</span>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="break-words text-base font-semibold leading-snug text-slate-50">${escapeHtml(tx.description)}</h3>
+              <p class="mt-1 text-sm text-slate-400">${formatDate(tx.date)}</p>
+            </div>
+            <strong class="shrink-0 text-right text-base font-semibold ${typeMeta.textClass}">${currency.format(tx.amount)}</strong>
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            ${categoryBadge(tx.category)}
+            ${typeBadge(tx.type)}
+            <span class="tag tag-slate">${icon(tx.recurring ? 'repeat-2' : 'circle', 'h-3.5 w-3.5')} ${tx.recurring ? 'Recorrente' : 'Pontual'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 flex justify-end">
+        <button class="btn-danger min-h-11 px-4 py-2 text-sm" data-delete-transaction="${tx.id}" aria-label="Excluir transação ${escapeHtml(tx.description)}">
+          ${icon('trash-2', 'h-4 w-4')} Excluir
+        </button>
+      </div>
+    </article>
+  `;
+}
+
 function priorityCard(title, value, subtitle, href) {
   return `
     <a href="${href}" class="rounded-[24px] border border-white/10 bg-white/5 p-4 hover-lift block">
@@ -1397,9 +1744,53 @@ function emptyState(text) {
 }
 
 function typeBadge(type) {
-  if (type === 'income') return '<span class="tag tag-emerald">Receita</span>';
-  if (type === 'investment') return '<span class="tag tag-violet">Investimento</span>';
-  return '<span class="tag tag-rose">Despesa</span>';
+  const meta = getTypeMeta(type);
+  return `<span class="tag ${meta.tagClass}">${icon(meta.icon, 'h-3.5 w-3.5')} ${meta.label}</span>`;
+}
+
+function getTypeMeta(type) {
+  if (type === 'income') {
+    return { label: 'Receita', icon: 'trending-up', tagClass: 'tag-emerald', textClass: 'text-emerald-300', iconClass: 'category-icon-emerald' };
+  }
+  if (type === 'investment') {
+    return { label: 'Investimento', icon: 'landmark', tagClass: 'tag-violet', textClass: 'text-violet-300', iconClass: 'category-icon-violet' };
+  }
+  return { label: 'Despesa', icon: 'trending-down', tagClass: 'tag-rose', textClass: 'text-rose-300', iconClass: 'category-icon-rose' };
+}
+
+function categoryBadge(category) {
+  const normalized = normalizeText(category);
+  const map = [
+    [/sal[aá]rio|freelance|renda|pix/, 'briefcase-business'],
+    [/alimenta|mercado|ifood|restaurante/, 'utensils'],
+    [/transporte|uber|combust/, 'car'],
+    [/moradia|casa|aluguel/, 'house'],
+    [/sa[uú]de|farm/, 'heart-pulse'],
+    [/educa|curso|livro/, 'graduation-cap'],
+    [/lazer|viagem|cinema/, 'ticket'],
+    [/invest/, 'landmark'],
+    [/assinatura|streaming|internet|redes/, 'repeat-2'],
+    [/fam[ií]lia/, 'users'],
+    [/cart[aã]o|banco/, 'credit-card']
+  ];
+  const match = map.find(([pattern]) => pattern.test(normalized));
+  const iconName = match?.[1] || 'tag';
+  return `<span class="category-badge">${icon(iconName, 'h-3.5 w-3.5')} ${escapeHtml(category)}</span>`;
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function scheduleToneClass(tone) {
+  if (tone === 'income') return 'border-emerald-400/20 bg-emerald-400/10';
+  if (tone === 'investment') return 'border-violet-400/20 bg-violet-400/10';
+  if (tone === 'subscription-pending') return 'border-sky-400/20 bg-sky-400/10';
+  if (tone === 'subscription-overdue') return 'border-rose-400/30 bg-rose-400/15';
+  return 'border-rose-400/20 bg-rose-400/10';
 }
 
 function selectOptions(options, currentValue) {
@@ -1433,7 +1824,21 @@ function resolveCategoryValue({ category, customCategory }) {
   return selected || 'Outros';
 }
 
+function readPositiveAmount(value) {
+  const amount = readMoneyAmount(value);
+  return amount > 0 ? amount : 0;
+}
+
+function readMoneyAmount(value) {
+  const raw = String(value || '').trim();
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  return finance.fromCents(finance.toCents(normalized));
+}
+
 function bindLoginPage() {
+  bindToastDismiss();
   document.querySelectorAll('[data-auth-mode]').forEach((button) => {
     button.addEventListener('click', () => {
       ui.authMode = button.dataset.authMode === 'register' ? 'register' : 'login';
@@ -1444,6 +1849,7 @@ function bindLoginPage() {
 }
 
 function bindShell() {
+  bindToastDismiss();
   document.getElementById('openSidebarBtn')?.addEventListener('click', () => {
     ui.sidebarOpen = true;
     syncSidebar();
@@ -1465,6 +1871,25 @@ function bindShell() {
     });
   });
   document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+}
+
+function bindToastDismiss() {
+  document.querySelectorAll('[data-dismiss-toast]').forEach((button) => {
+    button.addEventListener('click', () => {
+      ui.toast = null;
+      render();
+    });
+  });
+}
+
+function showToast(message, type = 'error', title) {
+  ui.toast = { message, type, title };
+  render();
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => {
+    ui.toast = null;
+    render();
+  }, 5200);
 }
 
 function syncSidebar() {
@@ -1567,7 +1992,7 @@ async function handleAuthSubmit(event) {
       await performAuthRequest('/api/auth/login', { email, password });
     }
   } catch (error) {
-    alert(error.message || 'Não foi possível concluir a autenticação.');
+    showToast(error.message || 'Não foi possível concluir a autenticação.', 'error', 'Login não realizado');
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
@@ -1597,11 +2022,16 @@ function bindTransactionsPage() {
       category: data.get('category'),
       customCategory: data.get('customCategory')
     });
+    const amount = readPositiveAmount(data.get('amount'));
+    if (!amount) {
+      showToast('Informe um valor maior que zero.', 'error', 'Transação inválida');
+      return;
+    }
 
     state.transactions.unshift({
       id: uid(),
       description: String(data.get('description') || '').trim(),
-      amount: Number(data.get('amount') || 0),
+      amount,
       date: String(data.get('date') || localISO(new Date())),
       type: String(data.get('type') || 'expense'),
       category,
@@ -1629,9 +2059,19 @@ function bindTransactionsPage() {
     persistViewValue('filterMonth', event.target.value);
     render();
   });
+  document.getElementById('exportTransactionsCsvBtn')?.addEventListener('click', () => {
+    const transactions = filterTransactions({
+      type: valueOf('filterType', 'all'),
+      recurring: valueOf('filterRecurring', 'all'),
+      search: valueOf('searchTransaction', ''),
+      month: valueOf('filterMonth', localISO(new Date()).slice(0, 7))
+    });
+    exportTransactionsCsv(transactions);
+  });
 
   document.querySelectorAll('[data-delete-transaction]').forEach((button) => {
     button.addEventListener('click', () => {
+      if (!confirmAction('Excluir esta transação? Essa ação será salva na sua conta.')) return;
       state.transactions = state.transactions.filter((tx) => tx.id !== button.dataset.deleteTransaction);
       saveState();
       render();
@@ -1645,7 +2085,24 @@ function bindGoalsPage() {
     const data = new FormData(event.currentTarget);
     state.goal = {
       name: String(data.get('goalName') || 'Meta financeira').trim(),
-      target: Number(data.get('goalTarget') || 0)
+      target: readMoneyAmount(data.get('goalTarget')),
+      currentAmount: readMoneyAmount(data.get('goalCurrentAmount'))
+    };
+    saveState();
+    render();
+  });
+
+  document.getElementById('goalContributionForm')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const amount = readPositiveAmount(data.get('goalContribution'));
+    if (!amount) {
+      showToast('Informe um aporte maior que zero.', 'error', 'Aporte inválido');
+      return;
+    }
+    state.goal = {
+      ...state.goal,
+      currentAmount: finance.addMoney(state.goal.currentAmount || 0, amount)
     };
     saveState();
     render();
@@ -1670,11 +2127,26 @@ function bindCalculatorPage() {
 function bindCalendarPage() {
   document.getElementById('prevCalendarBtn')?.addEventListener('click', () => {
     ui.calendarDate = new Date(ui.calendarDate.getFullYear(), ui.calendarDate.getMonth() - 1, 1);
+    ui.selectedCalendarDate = null;
     render();
   });
   document.getElementById('nextCalendarBtn')?.addEventListener('click', () => {
     ui.calendarDate = new Date(ui.calendarDate.getFullYear(), ui.calendarDate.getMonth() + 1, 1);
+    ui.selectedCalendarDate = null;
     render();
+  });
+  document.querySelectorAll('[data-calendar-day]').forEach((day) => {
+    const select = () => {
+      ui.selectedCalendarDate = day.dataset.calendarDay;
+      render();
+    };
+    day.addEventListener('click', select);
+    day.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        select();
+      }
+    });
   });
 }
 
@@ -1687,12 +2159,17 @@ function bindBudgetsPage() {
       category: data.get('category'),
       customCategory: data.get('customCategory')
     });
+    const limit = readPositiveAmount(data.get('limit'));
+    if (!limit) {
+      showToast('Informe um limite maior que zero.', 'error', 'Orçamento inválido');
+      return;
+    }
 
     state.budgets = state.budgets.filter((budget) => budget.category !== category);
     state.budgets.unshift({
       id: uid(),
       category,
-      limit: Number(data.get('limit') || 0)
+      limit
     });
     persistViewValue('draftBudgetCategory', category);
     saveState();
@@ -1701,6 +2178,7 @@ function bindBudgetsPage() {
 
   document.querySelectorAll('[data-delete-budget]').forEach((button) => {
     button.addEventListener('click', () => {
+      if (!confirmAction('Excluir este orçamento? As transações permanecem intactas.')) return;
       state.budgets = state.budgets.filter((budget) => budget.id !== button.dataset.deleteBudget);
       saveState();
       render();
@@ -1717,13 +2195,20 @@ function bindSubscriptionsPage() {
       category: data.get('category'),
       customCategory: data.get('customCategory')
     });
+    const amount = readPositiveAmount(data.get('amount'));
+    const dueDay = Math.max(1, Math.min(31, Number(data.get('dueDay') || 1)));
+    if (!amount) {
+      showToast('Informe um valor mensal maior que zero.', 'error', 'Assinatura inválida');
+      return;
+    }
     state.subscriptions.unshift({
       id: uid(),
       name: String(data.get('name') || '').trim(),
-      amount: Number(data.get('amount') || 0),
-      dueDay: Number(data.get('dueDay') || 1),
+      amount,
+      dueDay,
       category,
-      active: true
+      active: true,
+      payments: []
     });
     persistViewValue('draftSubscriptionCategory', category);
     saveState();
@@ -1742,8 +2227,26 @@ function bindSubscriptionsPage() {
     });
   });
 
+  document.querySelectorAll('[data-pay-subscription]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const input = document.getElementById(button.dataset.paymentInput);
+      markSubscriptionAsPaid(button.dataset.paySubscription, input?.value || localISO(new Date()));
+      saveState();
+      render();
+    });
+  });
+
+  document.querySelectorAll('[data-unpay-subscription]').forEach((button) => {
+    button.addEventListener('click', () => {
+      undoSubscriptionPayment(button.dataset.unpaySubscription);
+      saveState();
+      render();
+    });
+  });
+
   document.querySelectorAll('[data-delete-subscription]').forEach((button) => {
     button.addEventListener('click', () => {
+      if (!confirmAction('Excluir esta assinatura?')) return;
       state.subscriptions = state.subscriptions.filter((subscription) => subscription.id !== button.dataset.deleteSubscription);
       saveState();
       render();
@@ -1754,6 +2257,7 @@ function bindSubscriptionsPage() {
 function bindBackupPage() {
   document.getElementById('exportBackupBtn')?.addEventListener('click', exportBackup);
   document.getElementById('clearAllBtn')?.addEventListener('click', () => {
+    if (!confirmAction('Limpar transações, orçamentos e assinaturas? Essa ação será sincronizada com o banco.')) return;
     state = {
       ...getDefaultState(state.profile),
       transactions: [],
@@ -1807,6 +2311,36 @@ function exportBackup() {
   URL.revokeObjectURL(url);
 }
 
+function exportTransactionsCsv(transactions) {
+  const rows = [
+    ['data', 'descricao', 'categoria', 'tipo', 'valor', 'recorrente'],
+    ...transactions.map((tx) => [
+      tx.date,
+      tx.description,
+      tx.category,
+      tx.type,
+      tx.amount.toFixed(2).replace('.', ','),
+      tx.recurring ? 'sim' : 'nao'
+    ])
+  ];
+
+  const csv = rows.map((row) => row.map(csvCell).join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `obsyd-transacoes-${localISO(new Date())}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
 function importBackup(event) {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -1816,6 +2350,11 @@ function importBackup(event) {
     try {
       const payload = JSON.parse(String(reader.result || '{}'));
       if (payload.state) {
+        if (!isValidBackupState(payload.state)) {
+          showToast('O arquivo não tem a estrutura esperada de backup da Obsyd.', 'error', 'Backup inválido');
+          return;
+        }
+        if (!confirmAction('Importar este backup vai substituir seus dados atuais. Continuar?')) return;
         state = mergeDefaults(payload.state);
         saveState();
       }
@@ -1825,10 +2364,23 @@ function importBackup(event) {
       }
       render();
     } catch {
-      alert('Não foi possível importar esse arquivo JSON.');
+      showToast('Não foi possível importar esse arquivo JSON.', 'error', 'Importação falhou');
     }
   };
   reader.readAsText(file);
+}
+
+function confirmAction(message) {
+  return window.confirm(message);
+}
+
+function isValidBackupState(nextState) {
+  return nextState
+    && typeof nextState === 'object'
+    && !Array.isArray(nextState)
+    && Array.isArray(nextState.transactions)
+    && Array.isArray(nextState.budgets)
+    && Array.isArray(nextState.subscriptions);
 }
 
 function getSortedTransactions() {
@@ -1836,36 +2388,23 @@ function getSortedTransactions() {
 }
 
 function getMonthlyTransactions(baseDate) {
-  const year = baseDate.getFullYear();
-  const month = baseDate.getMonth();
-  return state.transactions.filter((tx) => {
-    const date = parseLocalDate(tx.date);
-    return date.getFullYear() === year && date.getMonth() === month;
-  });
+  return finance.getMonthTransactions(state.transactions, baseDate);
 }
 
 function getMonthlySummary(baseDate) {
-  return getMonthlyTransactions(baseDate).reduce((acc, tx) => {
-    if (tx.type === 'income') acc.income += tx.amount;
-    if (tx.type === 'expense') acc.expense += tx.amount;
-    if (tx.type === 'investment') acc.investment += tx.amount;
-    return acc;
-  }, { income: 0, expense: 0, investment: 0 });
+  return finance.summarizeMonth(state.transactions, baseDate);
 }
 
 function computeBalance() {
-  return state.transactions.reduce((total, tx) => {
-    if (tx.type === 'income') return total + tx.amount;
-    return total - tx.amount;
-  }, 0);
+  return finance.computeAvailableBalance(state.transactions);
 }
 
 function getGoalProgress() {
-  const balance = Math.max(0, computeBalance());
   const target = Number(state.goal.target) || 0;
-  const progress = target > 0 ? (balance / target) * 100 : 0;
-  const remaining = Math.max(0, target - balance);
-  return { balance, target, progress, remaining };
+  const currentAmount = Number(state.goal.currentAmount) || 0;
+  const progress = target > 0 ? (currentAmount / target) * 100 : 0;
+  const remaining = Math.max(0, target - currentAmount);
+  return { currentAmount, target, progress, remaining };
 }
 
 function getAverageMonthlyInvestment() {
@@ -1959,16 +2498,8 @@ function filterTransactions(filters) {
 }
 
 function getCurrentMonthCategoryExpense(category) {
-  const summary = getMonthlyTransactions(new Date()).reduce((sum, tx) => {
-    if (tx.type === 'expense' && tx.category === category) return sum + tx.amount;
-    return sum;
-  }, 0);
-
-  const subscriptionExpenses = state.subscriptions
-    .filter((subscription) => subscription.active && subscription.category === category)
-    .reduce((sum, subscription) => sum + subscription.amount, 0);
-
-  return summary + subscriptionExpenses;
+  const categories = finance.groupExpenseByCategory(state.transactions, new Date());
+  return categories[category] || 0;
 }
 
 function getBudgetStatus() {
@@ -1989,6 +2520,71 @@ function getActiveSubscriptionsTotal() {
   return state.subscriptions.filter((subscription) => subscription.active).reduce((sum, subscription) => sum + subscription.amount, 0);
 }
 
+function currentPeriodKey(date = new Date()) {
+  return localISO(new Date(date.getFullYear(), date.getMonth(), 1)).slice(0, 7);
+}
+
+function getSubscriptionPayment(subscription, periodMonth = currentPeriodKey()) {
+  return (Array.isArray(subscription?.payments) ? subscription.payments : [])
+    .find((payment) => payment.periodMonth === periodMonth) || null;
+}
+
+function isSubscriptionPaid(subscription, periodMonth = currentPeriodKey()) {
+  return finance.isSubscriptionPaid(subscription, periodMonth);
+}
+
+function getPendingSubscriptions(periodMonth = currentPeriodKey()) {
+  return finance.getPendingSubscriptions(state.subscriptions, periodMonth);
+}
+
+function markSubscriptionAsPaid(subscriptionId, paidAt = localISO(new Date()), periodMonth = currentPeriodKey()) {
+  const txId = uid();
+
+  state.subscriptions = state.subscriptions.map((subscription) => {
+    if (subscription.id !== subscriptionId || isSubscriptionPaid(subscription, periodMonth)) return subscription;
+    const payment = {
+      id: uid(),
+      periodMonth,
+      paidAt,
+      amount: subscription.amount,
+      transactionId: txId
+    };
+    return {
+      ...subscription,
+      payments: [...(subscription.payments || []), payment]
+    };
+  });
+
+  const subscription = state.subscriptions.find((item) => item.id === subscriptionId);
+  if (!subscription || !getSubscriptionPayment(subscription, periodMonth)) return;
+
+  state.transactions.unshift({
+    id: txId,
+    description: `Assinatura - ${subscription.name}`,
+    amount: subscription.amount,
+    date: paidAt,
+    type: 'expense',
+    category: subscription.category || 'Assinaturas',
+    recurring: false
+  });
+}
+
+function undoSubscriptionPayment(subscriptionId, periodMonth = currentPeriodKey()) {
+  let transactionId = '';
+  state.subscriptions = state.subscriptions.map((subscription) => {
+    if (subscription.id !== subscriptionId) return subscription;
+    const payment = getSubscriptionPayment(subscription, periodMonth);
+    transactionId = payment?.transactionId || '';
+    return {
+      ...subscription,
+      payments: (subscription.payments || []).filter((item) => item.periodMonth !== periodMonth)
+    };
+  });
+  if (transactionId) {
+    state.transactions = state.transactions.filter((tx) => tx.id !== transactionId);
+  }
+}
+
 function getNextChargeDate(dueDay) {
   const today = new Date();
   const year = today.getFullYear();
@@ -2004,10 +2600,12 @@ function getNextChargeDate(dueDay) {
   return next.toLocaleDateString('pt-BR');
 }
 
-function getScheduleItemsForDate(date) {
+function getCalendarItemsForDate(date) {
   const year = date.getFullYear();
   const month = date.getMonth();
   const day = date.getDate();
+  const periodMonth = currentPeriodKey(date);
+  const dateIso = localISO(date);
   const items = [];
 
   state.transactions.forEach((tx) => {
@@ -2023,30 +2621,47 @@ function getScheduleItemsForDate(date) {
       amount: tx.amount,
       category: tx.category,
       typeLabel: tx.type === 'income' ? 'Receita' : tx.type === 'investment' ? 'Investimento' : 'Despesa',
-      tone: tx.type
+      tone: tx.type,
+      status: 'realized'
     });
   });
 
   state.subscriptions
-    .filter((subscription) => subscription.active && Number(subscription.dueDay) === day)
+    .filter((subscription) => {
+      if (!subscription.active || isSubscriptionPaid(subscription, periodMonth)) return false;
+      return finance.getSubscriptionDueDate(subscription, periodMonth) === dateIso;
+    })
     .forEach((subscription) => {
+      const status = finance.getSubscriptionStatus(subscription, periodMonth, localISO(new Date()));
       items.push({
         title: subscription.name,
         amount: subscription.amount,
         category: subscription.category,
-        typeLabel: 'Assinatura',
-        tone: 'subscription'
+        typeLabel: status === 'overdue' ? 'Assinatura atrasada' : 'Assinatura pendente',
+        tone: status === 'overdue' ? 'subscription-overdue' : 'subscription-pending',
+        status: 'pending'
       });
     });
 
-  return items.sort((a, b) => b.amount - a.amount);
+  return items.sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+    return b.amount - a.amount;
+  });
+}
+
+function getCalendarSummary(items) {
+  return (Array.isArray(items) ? items : []).reduce((summary, item) => {
+    const key = item.status === 'pending' ? 'pending' : 'realized';
+    summary[key] = finance.addMoney(summary[key], item.amount || 0);
+    return summary;
+  }, { realized: 0, pending: 0 });
 }
 
 function groupDueItemsByDay(year, month) {
   const map = {};
   const totalDays = new Date(year, month + 1, 0).getDate();
   for (let day = 1; day <= totalDays; day += 1) {
-    const items = getScheduleItemsForDate(new Date(year, month, day));
+    const items = getCalendarItemsForDate(new Date(year, month, day));
     if (items.length) {
       map[day] = items;
     }
@@ -2077,7 +2692,7 @@ function getUpcomingBills(daysAhead = 7) {
   for (let offset = 0; offset <= daysAhead; offset += 1) {
     const target = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
     const dueMap = groupDueItemsByDay(target.getFullYear(), target.getMonth());
-    const dayItems = (dueMap[target.getDate()] || []).filter((item) => item.tone !== 'income');
+    const dayItems = (dueMap[target.getDate()] || []).filter((item) => item.status === 'pending');
     dayItems.forEach((item) => items.push({
       ...item,
       dueDate: new Date(target)
@@ -2092,17 +2707,18 @@ function sumAmount(items) {
 }
 
 function getReportInsights() {
-  const monthly = getMonthlySummary(new Date());
-  const monthlyNet = monthly.income - monthly.expense - monthly.investment;
+  const position = finance.computeFinancialPosition(state.transactions, new Date());
+  const monthly = position.monthly;
+  const monthlyNet = monthly.netCashFlow;
   const expenseByCategory = getExpenseCategoriesForCurrentMonth();
-  const categoryEntries = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1]);
-  const topCategory = categoryEntries[0]
-    ? { label: categoryEntries[0][0], detail: currency.format(categoryEntries[0][1]) }
+  const top = finance.getTopCategory(expenseByCategory);
+  const topCategory = top
+    ? { label: top.category, detail: currency.format(top.amount) }
     : { label: 'Sem despesas', detail: 'Nenhuma saída registrada' };
 
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const daysInMonth = finance.daysInMonth(new Date());
   const avgDailyExpense = monthly.expense / daysInMonth;
-  const runway = monthly.expense > 0 ? computeBalance() / monthly.expense : null;
+  const runway = finance.computeRunway(position.availableBalance, monthly.expense);
 
   return {
     topCategory,
@@ -2113,18 +2729,51 @@ function getReportInsights() {
 }
 
 function getExpenseCategoriesForCurrentMonth() {
-  const categories = {};
-  getMonthlyTransactions(new Date()).forEach((tx) => {
-    if (tx.type === 'expense') categories[tx.category] = (categories[tx.category] || 0) + tx.amount;
+  return finance.groupExpenseByCategory(state.transactions, new Date());
+}
+
+function buildFinancialInsights() {
+  const position = finance.computeFinancialPosition(state.transactions, new Date());
+  const comparison = finance.compareMonths(state.transactions, new Date());
+  const expenses = getExpenseCategoriesForCurrentMonth();
+  const top = finance.getTopCategory(expenses);
+  const upcoming = getUpcomingBills(7);
+  const insights = [];
+
+  insights.push(top ? {
+    tone: 'info',
+    label: 'Categoria',
+    title: `${top.category} lidera as despesas`,
+    description: `Essa categoria soma ${currency.format(top.amount)} no mês atual.`
+  } : {
+    tone: 'neutral',
+    label: 'Categoria',
+    title: 'Sem despesas no mês',
+    description: 'Quando houver movimentações, a categoria de maior peso aparecerá aqui.'
   });
 
-  state.subscriptions
-    .filter((subscription) => subscription.active)
-    .forEach((subscription) => {
-      categories[subscription.category] = (categories[subscription.category] || 0) + subscription.amount;
-    });
+  insights.push({
+    tone: comparison.delta.expense > 0 ? 'danger' : 'success',
+    label: 'Comparativo',
+    title: comparison.delta.expense > 0 ? 'Despesas subiram' : 'Despesas controladas',
+    description: `Variação contra o mês anterior: ${currency.format(comparison.delta.expense)}.`
+  });
 
-  return categories;
+  insights.push({
+    tone: upcoming.length ? 'danger' : 'success',
+    label: 'Agenda',
+    title: upcoming.length ? `${upcoming.length} vencimento(s) próximos` : 'Sem vencimentos próximos',
+    description: upcoming.length ? `Total previsto em 7 dias: ${currency.format(sumAmount(upcoming))}.` : 'Sua agenda financeira dos próximos 7 dias está livre.'
+  });
+
+  insights.push({
+    tone: position.monthly.netCashFlow >= 0 ? 'success' : 'danger',
+    label: 'Caixa',
+    title: position.monthly.netCashFlow >= 0 ? 'Saldo líquido positivo' : 'Saldo líquido negativo',
+    description: `Receitas - despesas - investimentos = ${currency.format(position.monthly.netCashFlow)}.`
+  });
+
+  return insights;
 }
 
 function buildAlerts() {
@@ -2271,10 +2920,7 @@ function renderReportCharts() {
         borderWidth: 0
       }]
     },
-    options: {
-      ...chartBaseOptions(),
-      cutout: '68%'
-    }
+    options: doughnutChartOptions(values)
   });
   finalizeChart(charts.reportCategory);
 
@@ -2309,6 +2955,11 @@ function chartBaseOptions() {
         labels: {
           color: '#cbd5e1'
         }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.dataset.label || context.label}: ${currency.format(context.parsed.y ?? context.parsed)}`
+        }
       }
     },
     scales: {
@@ -2322,6 +2973,34 @@ function chartBaseOptions() {
           callback: (value) => currency.format(value)
         },
         grid: { color: 'rgba(255,255,255,0.05)' }
+      }
+    }
+  };
+}
+
+function doughnutChartOptions(values) {
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '68%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#cbd5e1',
+          usePointStyle: true,
+          padding: 18
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const value = Number(context.parsed || 0);
+            const percent = total > 0 ? ` (${((value / total) * 100).toFixed(1)}%)` : '';
+            return `${context.label}: ${currency.format(value)}${percent}`;
+          }
+        }
       }
     }
   };

@@ -40,6 +40,7 @@ const pool = HAS_DATABASE
   : null;
 
 let schemaPromise = null;
+const loginAttempts = new Map();
 
 if (pool) {
   pool.on('error', (error) => {
@@ -202,6 +203,7 @@ async function initializeSchema() {
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       target NUMERIC NOT NULL DEFAULT 0,
+      current_amount NUMERIC NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -250,13 +252,29 @@ async function initializeSchema() {
       CONSTRAINT subscriptions_due_day_check CHECK (due_day BETWEEN 1 AND 31)
     );
 
+    CREATE TABLE IF NOT EXISTS subscription_payments (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      subscription_id TEXT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+      period_month TEXT NOT NULL,
+      paid_at DATE NOT NULL,
+      amount NUMERIC NOT NULL DEFAULT 0,
+      transaction_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, subscription_id, period_month)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id_date ON transactions(user_id, date DESC, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_id_type_date ON transactions(user_id, type, date DESC);
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_id_category_date ON transactions(user_id, category, date DESC);
     CREATE INDEX IF NOT EXISTS idx_budgets_user_id_created_at ON budgets(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id_created_at ON subscriptions(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_subscription_payments_user_id_period ON subscription_payments(user_id, period_month DESC);
   `);
 
   await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT');
+  await pool.query('ALTER TABLE goals ADD COLUMN IF NOT EXISTS current_amount NUMERIC NOT NULL DEFAULT 0');
 }
 
 async function withTransaction(callback) {
@@ -306,12 +324,34 @@ async function verifyPassword(password, passwordHash) {
   return crypto.timingSafeEqual(expected, received);
 }
 
+async function validatePasswordWithLegacyUpgrade(client, user, password, now) {
+  if (!user) return false;
+
+  if (user.password_hash && await verifyPassword(password, user.password_hash)) {
+    return true;
+  }
+
+  const legacyPlainHash = user.password_hash && !String(user.password_hash).includes(':') && password === user.password_hash;
+  const legacyHint = user.password_hint && password === user.password_hint;
+
+  if (!legacyPlainHash && !legacyHint) {
+    return false;
+  }
+
+  const nextHash = await hashPassword(password);
+  await client.query(
+    'UPDATE users SET password_hash = $1, password_hint = NULL, updated_at = $2 WHERE id = $3',
+    [nextHash, now, user.id]
+  );
+  return true;
+}
+
 async function initializeEmptyUserState(client, userId) {
   const now = utcNow();
 
   await client.query(
-    'INSERT INTO goals (user_id, name, target, updated_at) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id) DO NOTHING',
-    [userId, 'Objetivo principal', 0, now]
+    'INSERT INTO goals (user_id, name, target, current_amount, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id) DO NOTHING',
+    [userId, 'Objetivo principal', 0, 0, now]
   );
 
   await client.query(
@@ -339,9 +379,9 @@ async function findUserByToken(token, client = pool) {
 async function buildState(userId, client = pool) {
   await ensureDatabase();
 
-  const [userResult, goalResult, calculatorResult, transactionsResult, budgetsResult, subscriptionsResult] = await Promise.all([
+  const [userResult, goalResult, calculatorResult, transactionsResult, budgetsResult, subscriptionsResult, subscriptionPaymentsResult] = await Promise.all([
     client.query('SELECT id, name, email FROM users WHERE id = $1 LIMIT 1', [userId]),
-    client.query('SELECT name, target FROM goals WHERE user_id = $1 LIMIT 1', [userId]),
+    client.query('SELECT name, target, current_amount FROM goals WHERE user_id = $1 LIMIT 1', [userId]),
     client.query('SELECT initial_amount, monthly_contribution, annual_rate, years FROM calculator_settings WHERE user_id = $1 LIMIT 1', [userId]),
     client.query(
       `SELECT id, description, amount, type, category, date, recurring
@@ -363,6 +403,13 @@ async function buildState(userId, client = pool) {
        WHERE user_id = $1
        ORDER BY created_at DESC`,
       [userId]
+    ),
+    client.query(
+      `SELECT id, subscription_id, period_month, paid_at, amount, transaction_id
+       FROM subscription_payments
+       WHERE user_id = $1
+       ORDER BY period_month DESC, paid_at DESC`,
+      [userId]
     )
   ]);
 
@@ -377,7 +424,8 @@ async function buildState(userId, client = pool) {
     },
     goal: {
       name: goal?.name || 'Meta financeira',
-      target: Number(goal?.target || 0)
+      target: Number(goal?.target || 0),
+      currentAmount: Number(goal?.current_amount || 0)
     },
     calculator: {
       initialAmount: Number(calculator?.initial_amount || 0),
@@ -399,14 +447,27 @@ async function buildState(userId, client = pool) {
       category: row.category,
       limit: Number(row.limit_amount || 0)
     })),
-    subscriptions: subscriptionsResult.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      amount: Number(row.amount || 0),
-      dueDay: Number(row.due_day || 1),
-      category: row.category,
-      active: Boolean(row.active)
-    }))
+    subscriptions: subscriptionsResult.rows.map((row) => {
+      const payments = subscriptionPaymentsResult.rows
+        .filter((payment) => payment.subscription_id === row.id)
+        .map((payment) => ({
+          id: payment.id,
+          periodMonth: payment.period_month,
+          paidAt: toDateOnly(payment.paid_at),
+          amount: Number(payment.amount || 0),
+          transactionId: payment.transaction_id || ''
+        }));
+
+      return {
+        id: row.id,
+        name: row.name,
+        amount: Number(row.amount || 0),
+        dueDay: Number(row.due_day || 1),
+        category: row.category,
+        active: Boolean(row.active),
+        payments
+      };
+    })
   };
 }
 
@@ -435,18 +496,20 @@ async function replaceUserDataset(userId, state, client) {
 
   await client.query('DELETE FROM goals WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM calculator_settings WHERE user_id = $1', [userId]);
+  await client.query('DELETE FROM subscription_payments WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM budgets WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM subscriptions WHERE user_id = $1', [userId]);
 
   await client.query(
-    'INSERT INTO goals (user_id, name, target, updated_at) VALUES ($1, $2, $3, $4)',
-    [
-      userId,
-      String(goal.name || 'Meta financeira').trim() || 'Meta financeira',
-      Number(goal.target || 0),
-      now
-    ]
+    'INSERT INTO goals (user_id, name, target, current_amount, updated_at) VALUES ($1, $2, $3, $4, $5)',
+      [
+        userId,
+        String(goal.name || 'Meta financeira').trim() || 'Meta financeira',
+        sanitizeMoney(goal.target),
+        sanitizeMoney(goal.currentAmount),
+        now
+      ]
   );
 
   await client.query(
@@ -454,9 +517,9 @@ async function replaceUserDataset(userId, state, client) {
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       userId,
-      Number(calculator.initialAmount || 0),
-      Number(calculator.monthlyContribution || 0),
-      Number(calculator.annualRate || 0),
+      sanitizeMoney(calculator.initialAmount),
+      sanitizeMoney(calculator.monthlyContribution),
+      Number.isFinite(Number(calculator.annualRate)) ? Math.max(0, Number(calculator.annualRate)) : 0,
       Number(calculator.years || 0),
       now
     ]
@@ -471,7 +534,7 @@ async function replaceUserDataset(userId, state, client) {
         String(item.id || makeId('tx')),
         userId,
         String(item.description || 'Sem descrição').trim() || 'Sem descrição',
-        Number(item.amount || 0),
+        sanitizeMoney(item.amount),
         type,
         String(item.category || 'Outros').trim() || 'Outros',
         String(item.date || utcNow().slice(0, 10)),
@@ -490,7 +553,7 @@ async function replaceUserDataset(userId, state, client) {
         String(item.id || makeId('budget')),
         userId,
         String(item.category || 'Outros').trim() || 'Outros',
-        Number(item.limit || 0),
+        sanitizeMoney(item.limit),
         now,
         now
       ]
@@ -499,14 +562,15 @@ async function replaceUserDataset(userId, state, client) {
 
   for (const item of subscriptions) {
     const dueDay = Math.max(1, Math.min(31, Number(item.dueDay || 1)));
+    const subscriptionId = String(item.id || makeId('sub'));
     await client.query(
       `INSERT INTO subscriptions (id, user_id, name, amount, due_day, category, active, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
-        String(item.id || makeId('sub')),
+        subscriptionId,
         userId,
         String(item.name || 'Assinatura').trim() || 'Assinatura',
-        Number(item.amount || 0),
+        sanitizeMoney(item.amount),
         dueDay,
         String(item.category || 'Assinaturas').trim() || 'Assinaturas',
         item.active !== false,
@@ -514,6 +578,27 @@ async function replaceUserDataset(userId, state, client) {
         now
       ]
     );
+
+    const payments = Array.isArray(item.payments) ? item.payments : [];
+    for (const payment of payments) {
+      const periodMonth = String(payment.periodMonth || '').slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(periodMonth)) continue;
+      await client.query(
+        `INSERT INTO subscription_payments (id, user_id, subscription_id, period_month, paid_at, amount, transaction_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (user_id, subscription_id, period_month) DO NOTHING`,
+        [
+          String(payment.id || makeId('subpay')),
+          userId,
+          subscriptionId,
+          periodMonth,
+          String(payment.paidAt || utcNow().slice(0, 10)),
+          sanitizeMoney(payment.amount || item.amount),
+          String(payment.transactionId || ''),
+          now
+        ]
+      );
+    }
   }
 }
 
@@ -533,12 +618,11 @@ function extractSessionToken(req) {
 function sendJson(res, statusCode, payload, extraHeaders = {}) {
   const body = Buffer.from(JSON.stringify(payload), 'utf8');
   res.writeHead(statusCode, {
+    ...securityHeaders(),
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': body.length,
     'Cache-Control': 'no-store',
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     ...extraHeaders
   });
   res.end(body);
@@ -549,14 +633,21 @@ function sendFile(res, filePath) {
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
   const data = fs.readFileSync(filePath);
   res.writeHead(200, {
+    ...securityHeaders(),
     'Content-Type': contentType,
     'Content-Length': data.length,
-    'Cache-Control': 'no-store',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS'
+    'Cache-Control': 'no-store'
   });
   res.end(data);
+}
+
+function securityHeaders() {
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+  };
 }
 
 function readJsonBody(req) {
@@ -580,6 +671,29 @@ function readJsonBody(req) {
     });
     req.on('error', () => resolve({}));
   });
+}
+
+function getClientIp(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'local').split(',')[0].trim();
+}
+
+function isRateLimited(key, limit = 8, windowMs = 10 * 60 * 1000) {
+  const now = Date.now();
+  const current = loginAttempts.get(key) || { count: 0, resetAt: now + windowMs };
+  if (current.resetAt <= now) {
+    loginAttempts.set(key, { count: 1, resetAt: now + windowMs });
+    return false;
+  }
+
+  current.count += 1;
+  loginAttempts.set(key, current);
+  return current.count > limit;
+}
+
+function sanitizeMoney(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric < 0) return 0;
+  return Math.round(numeric * 100) / 100;
 }
 
 function resolveStaticPath(urlPathname) {
@@ -611,7 +725,7 @@ async function handler(req, res) {
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      ...securityHeaders(),
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS'
     });
@@ -654,9 +768,13 @@ async function handler(req, res) {
     const payload = await readJsonBody(req);
     const email = String(payload.email || '').trim().toLowerCase();
     const password = String(payload.password || '').trim();
+    const attemptKey = `${getClientIp(req)}:${email || 'sem-email'}`;
 
     if (!email || !email.includes('@') || !password) {
       return sendJson(res, 400, { error: 'Informe um e-mail e uma senha válidos.' });
+    }
+    if (isRateLimited(attemptKey)) {
+      return sendJson(res, 429, { error: 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.' });
     }
 
     try {
@@ -668,25 +786,13 @@ async function handler(req, res) {
         );
         const user = userResult.rows[0] || null;
         if (!user) {
-          throw new Error('Nenhuma conta encontrada com esse e-mail.');
+          throw new Error('Credenciais inválidas.');
         }
 
-        let isValid = false;
-        if (user.password_hash) {
-          isValid = await verifyPassword(password, user.password_hash);
-        } else if (user.password_hint) {
-          isValid = password === user.password_hint;
-          if (isValid) {
-            const nextHash = await hashPassword(password);
-            await client.query(
-              'UPDATE users SET password_hash = $1, password_hint = NULL, updated_at = $2 WHERE id = $3',
-              [nextHash, now, user.id]
-            );
-          }
-        }
+        const isValid = await validatePasswordWithLegacyUpgrade(client, user, password, now);
 
         if (!isValid) {
-          throw new Error('Senha incorreta.');
+          throw new Error('Credenciais inválidas.');
         }
 
         const token = crypto.randomBytes(24).toString('base64url');
