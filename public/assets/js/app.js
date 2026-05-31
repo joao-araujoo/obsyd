@@ -7,6 +7,7 @@ const app = document.getElementById('app');
 const routes = [
   { key: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
   { key: 'transactions', label: 'Transações', icon: 'arrow-right-left' },
+  { key: 'accounts', label: 'Contas e Cartões', icon: 'wallet-cards' },
   { key: 'goals', label: 'Metas', icon: 'piggy-bank' },
   { key: 'calculator', label: 'Juros Compostos', icon: 'calculator' },
   { key: 'calendar', label: 'Calendário', icon: 'calendar-days' },
@@ -19,6 +20,84 @@ const routes = [
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
+const designColors = {
+  textPrimary: '#f8fafc',
+  textSecondary: '#cbd5e1',
+  textMuted: '#94a3b8',
+  grid: 'rgba(148, 163, 184, 0.10)',
+  border: 'rgba(148, 163, 184, 0.16)',
+  accent: '#8b7cf6',
+  accentSoft: 'rgba(139, 124, 246, 0.14)',
+  success: '#34d399',
+  successSoft: 'rgba(52, 211, 153, 0.12)',
+  danger: '#fb7185',
+  dangerSoft: 'rgba(251, 113, 133, 0.12)',
+  warning: '#fbbf24',
+  warningSoft: 'rgba(251, 191, 36, 0.12)',
+  info: '#38bdf8',
+  infoSoft: 'rgba(56, 189, 248, 0.12)'
+};
+
+const accountTypeOptions = [
+  ['checking_account', 'Conta corrente'],
+  ['savings_account', 'Conta poupança'],
+  ['credit_card', 'Cartão de crédito'],
+  ['debit_card', 'Cartão de débito'],
+  ['cash', 'Dinheiro físico'],
+  ['digital_wallet', 'Carteira digital'],
+  ['investment_account', 'Investimentos'],
+  ['prepaid_card', 'Cartão pré-pago'],
+  ['benefits_card', 'Cartão benefícios'],
+  ['other', 'Outro']
+];
+
+const cardBrandOptions = [
+  ['', 'Sem bandeira'],
+  ['Visa', 'Visa'],
+  ['Mastercard', 'Mastercard'],
+  ['Elo', 'Elo'],
+  ['Amex', 'Amex'],
+  ['Hipercard', 'Hipercard'],
+  ['Outra', 'Outra']
+];
+
+const domainIcons = Object.freeze({
+  dashboard: 'layout-dashboard',
+  transactions: 'arrow-right-left',
+  accounts: 'wallet-cards',
+  goals: 'piggy-bank',
+  calculator: 'calculator',
+  calendar: 'calendar-days',
+  budgets: 'wallet-cards',
+  subscriptions: 'repeat-2',
+  reports: 'chart-no-axes-combined',
+  alerts: 'bell-ring',
+  backup: 'database-backup',
+  pix: 'qr-code',
+  credit: 'credit-card',
+  debit: 'badge-dollar-sign',
+  cash: 'banknote',
+  boleto: 'barcode',
+  transfer: 'landmark',
+  wallet: 'wallet-cards',
+  investment: 'chart-no-axes-combined'
+});
+
+const quickAccountPresets = [
+  { label: 'Nubank Conta', institutionSlug: 'nubank', type: 'checking_account', methods: ['pix', 'debit_card', 'bank_transfer', 'boleto', 'auto_debit'] },
+  { label: 'Nubank Crédito', institutionSlug: 'nubank', type: 'credit_card', methods: ['credit_card'] },
+  { label: 'Banco Inter Conta', institutionSlug: 'banco-inter', type: 'checking_account', methods: ['pix', 'debit_card', 'bank_transfer', 'boleto', 'auto_debit'] },
+  { label: 'Banco Inter Crédito', institutionSlug: 'banco-inter', type: 'credit_card', methods: ['credit_card'] },
+  { label: 'Itaú Conta', institutionSlug: 'itau', type: 'checking_account', methods: ['pix', 'debit_card', 'bank_transfer', 'boleto', 'auto_debit'] },
+  { label: 'Itaú Crédito', institutionSlug: 'itau', type: 'credit_card', methods: ['credit_card'] },
+  { label: 'Santander Conta', institutionSlug: 'santander', type: 'checking_account', methods: ['pix', 'debit_card', 'bank_transfer', 'boleto', 'auto_debit'] },
+  { label: 'Santander Crédito', institutionSlug: 'santander', type: 'credit_card', methods: ['credit_card'] },
+  { label: 'Mercado Pago', institutionSlug: 'mercado-pago', type: 'digital_wallet', methods: ['pix', 'digital_wallet', 'debit_card', 'credit_card'] },
+  { label: 'PicPay', institutionSlug: 'picpay', type: 'digital_wallet', methods: ['pix', 'digital_wallet', 'debit_card', 'credit_card'] },
+  { label: 'C6 Bank Conta', institutionSlug: 'c6-bank', type: 'checking_account', methods: ['pix', 'debit_card', 'bank_transfer', 'boleto', 'auto_debit'] },
+  { label: 'BTG Investimentos', institutionSlug: 'btg-pactual', type: 'investment_account', methods: ['bank_transfer', 'ted_doc'] },
+  { label: 'Dinheiro físico', institutionSlug: 'dinheiro-fisico', type: 'cash', methods: ['cash'] }
+];
 
 let state = getDefaultState();
 let auth = createEmptyAuth();
@@ -80,6 +159,9 @@ function mergeDefaults(saved) {
     profile: { ...base.profile, ...(saved.profile || {}) },
     goal: { ...base.goal, ...(saved.goal || {}) },
     calculator: { ...base.calculator, ...(saved.calculator || {}) },
+    paymentMethods: Array.isArray(saved.paymentMethods) ? saved.paymentMethods : base.paymentMethods,
+    financialInstitutions: Array.isArray(saved.financialInstitutions) ? saved.financialInstitutions : base.financialInstitutions,
+    financialAccounts: Array.isArray(saved.financialAccounts) ? saved.financialAccounts : base.financialAccounts,
     transactions: Array.isArray(saved.transactions) ? saved.transactions : base.transactions,
     budgets: Array.isArray(saved.budgets) ? saved.budgets : base.budgets,
     subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : base.subscriptions
@@ -245,6 +327,9 @@ function getDefaultState(profileSource = {}) {
       annualRate: 0,
       years: 10
     },
+    paymentMethods: getFallbackPaymentMethods(),
+    financialInstitutions: getFallbackFinancialInstitutions(),
+    financialAccounts: [],
     transactions: [],
     budgets: [],
     subscriptions: []
@@ -521,12 +606,7 @@ function renderShell(pageTitle, content) {
                 <p class="truncate text-sm text-slate-400">${auth.email || 'sem-email'}</p>
               </div>
               <button id="logoutBtn" class="icon-ghost ml-auto h-10 w-10 shrink-0 p-0" aria-label="Deslogar" title="Deslogar">
-                <span aria-hidden="true">
-                  <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M14 16L18 12M18 12L14 8M18 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M10 4H7.8C6.11984 4 5.27976 4 4.63803 4.32698C4.07354 4.6146 3.6146 5.07354 3.32698 5.63803C3 6.27976 3 7.11984 3 8.8V15.2C3 16.8802 3 17.7202 3.32698 18.362C3.6146 18.9265 4.07354 19.3854 4.63803 19.673C5.27976 20 6.11984 20 7.8 20H10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                  </svg>
-                </span>
+                ${icon('log-out', 'h-4 w-4')}
               </button>
             </div>
           </div>
@@ -534,36 +614,68 @@ function renderShell(pageTitle, content) {
       </aside>
 
       <div class="min-w-0">
-        <header class="sticky top-0 z-30 border-b border-white/10 bg-slate-950/72 backdrop-blur-xl">
-          <div class="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-            <div class="flex items-start justify-between gap-3 max-lg:items-center">
-              <div class="flex min-w-0 items-center gap-3">
-                <button id="openSidebarBtn" class="btn-secondary h-11 w-11 shrink-0 p-0 lg:hidden" aria-label="Abrir menu">${icon('menu', 'h-5 w-5')}</button>
-                <div class="min-w-0 max-lg:hidden">
-                  <p class="text-[11px] uppercase tracking-[0.28em] text-slate-500">${headerCopy.eyebrow}</p>
-                  <h1 class="text-2xl font-semibold tracking-tight text-slate-50 sm:text-[2rem]">${headerCopy.title}</h1>
-                  <p class="mt-1 text-sm text-slate-400">${headerCopy.subtitle}</p>
-                </div>
-              </div>
-              <div class="hidden xl:flex items-center gap-2 pl-4">
-                <span class="tag tag-slate">${monthLabel.format(new Date())}</span>
-                <span class="tag tag-slate">Saldo disponível: ${currency.format(computeBalance())}</span>
-                <span class="tag tag-emerald">${getWelcomeLabel()}</span>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 max-lg:hidden xl:hidden">
-              <span class="tag tag-slate">${monthLabel.format(new Date())}</span>
-              <span class="tag tag-slate">Saldo disponível: ${currency.format(computeBalance())}</span>
-              <span class="tag tag-emerald">${getWelcomeLabel()}</span>
-            </div>
-          </div>
-        </header>
+        ${renderAppHeader(headerCopy)}
 
         <main class="mx-auto max-w-[1600px] px-4 py-6 pb-24 sm:px-6 lg:px-8">
           ${content}
         </main>
       </div>
     </div>
+  `;
+}
+
+function renderAppHeader(headerCopy) {
+  return `
+    <header class="app-header sticky top-0 z-30">
+      <div class="mx-auto flex max-w-[1600px] flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <button id="openSidebarBtn" class="btn-secondary h-10 w-10 shrink-0 p-0 lg:hidden" aria-label="Abrir menu">${icon('menu', 'h-5 w-5')}</button>
+            <div class="min-w-0">
+              <p class="app-breadcrumb">${headerCopy.breadcrumb}</p>
+              <h1 class="truncate text-xl font-semibold tracking-tight text-slate-50 sm:text-2xl">${headerCopy.title}</h1>
+              <p class="mt-0.5 hidden truncate text-sm text-slate-400 sm:block">${headerCopy.subtitle}</p>
+            </div>
+          </div>
+          <div class="header-pills">
+            ${periodSelector()}
+            ${balancePill()}
+            ${userGreeting()}
+          </div>
+        </div>
+        ${renderQuickActions()}
+      </div>
+    </header>
+  `;
+}
+
+function periodSelector() {
+  return `<span class="topbar-pill">${icon('calendar', 'h-3.5 w-3.5')} ${escapeHtml(monthLabel.format(new Date()))}</span>`;
+}
+
+function balancePill() {
+  const balance = computeBalance();
+  return `<span class="topbar-pill ${balance >= 0 ? 'is-positive' : 'is-negative'}">${icon('wallet', 'h-3.5 w-3.5')} ${currency.format(balance)}</span>`;
+}
+
+function userGreeting() {
+  const firstName = String(auth.name || state.profile?.name || 'você').trim().split(/\s+/)[0];
+  return `
+    <span class="topbar-pill user-greeting">
+      <span class="user-dot">${escapeHtml(firstName.slice(0, 1).toUpperCase() || 'U')}</span>
+      ${escapeHtml(getWelcomeLabel())}
+    </span>
+  `;
+}
+
+function renderQuickActions() {
+  return `
+    <nav class="quick-actions" aria-label="Ações rápidas">
+      <a href="#/transactions" class="quick-action primary">${icon('plus', 'h-3.5 w-3.5')} Nova transação</a>
+      <a href="#/accounts" class="quick-action">${icon('credit-card', 'h-3.5 w-3.5')} Conta/cartão</a>
+      <a href="#/reports" class="quick-action">${icon('chart-no-axes-combined', 'h-3.5 w-3.5')} Relatórios</a>
+      <a href="#/backup" class="quick-action">${icon('download', 'h-3.5 w-3.5')} Backup</a>
+    </nav>
   `;
 }
 
@@ -575,19 +687,24 @@ function getWelcomeLabel() {
 }
 
 function getHeaderCopy(route, fallbackTitle) {
-  const firstName = String(auth.name || state.profile?.name || 'você').trim().split(/\s+/)[0];
-  if (route === 'dashboard') {
-    return {
-      eyebrow: `${BRAND_NAME} • visão central`,
-      title: `${getWelcomeLabel()}. Sua operação financeira está ganhando contexto.`,
-      subtitle: `${firstName}, acompanhe caixa, metas e próximos movimentos em um painel pensado para decidir rápido e com segurança.`
-    };
-  }
+  const subtitleByRoute = {
+    dashboard: `Resumo financeiro de ${monthLabel.format(new Date())}.`,
+    transactions: 'Registre, filtre e acompanhe seus movimentos.',
+    accounts: 'Gerencie bancos, cartões e métodos de pagamento.',
+    goals: 'Acompanhe metas e aportes planejados.',
+    calculator: 'Projete juros compostos e patrimônio futuro.',
+    calendar: 'Veja vencimentos e movimentações por data.',
+    budgets: 'Controle limites mensais por categoria.',
+    subscriptions: 'Acompanhe recorrências e pagamentos.',
+    reports: 'Analise gastos, receitas e evolução financeira.',
+    alerts: 'Revise sinais que merecem atenção.',
+    backup: 'Exporte, importe e proteja seus dados.'
+  };
 
   return {
-    eyebrow: `${BRAND_NAME} • área logada`,
-    title: fallbackTitle,
-    subtitle: 'Tudo o que você altera aqui fica salvo na sua conta e sincronizado com o Neon em tempo real.'
+    breadcrumb: `${BRAND_NAME} / ${fallbackTitle}`,
+    title: route === 'dashboard' ? 'Dashboard' : fallbackTitle,
+    subtitle: subtitleByRoute[route] || 'Dados salvos e sincronizados na sua conta.'
   };
 }
 
@@ -597,6 +714,8 @@ function renderPage(route) {
       return renderDashboardPage();
     case 'transactions':
       return renderTransactionsPage();
+    case 'accounts':
+      return renderAccountsPage();
     case 'goals':
       return renderGoalsPage();
     case 'calculator':
@@ -628,40 +747,35 @@ function renderDashboardPage() {
   const budgetPct = budgetStatus.totalLimit > 0 ? Math.min(100, (budgetStatus.totalSpent / budgetStatus.totalLimit) * 100) : 0;
   const recent = getSortedTransactions().slice(0, 6);
   const insights = buildFinancialInsights();
+  const accountSummary = getPaymentSourceSummary();
 
   return `
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      ${metricCard('Saldo disponível', currency.format(position.availableBalance), 'Caixa livre: receitas menos despesas e aportes.', position.availableBalance >= 0 ? 'emerald' : 'rose', 'card-enter')}
-      ${metricCard('Receitas do mês', currency.format(monthly.income), 'Entradas registradas no mês atual.', 'emerald', 'card-enter card-enter-delay-1')}
-      ${metricCard('Despesas do mês', currency.format(monthly.expense), 'Saídas consumidas no mês atual.', 'rose', 'card-enter card-enter-delay-2')}
-      ${metricCard('Investimentos do mês', currency.format(monthly.investment), 'Aportes destinados ao futuro.', 'violet', 'card-enter card-enter-delay-3')}
+    <section class="dashboard-fold grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      ${metricCard('Saldo disponível', currency.format(position.availableBalance), 'Disponível agora', position.availableBalance >= 0 ? 'emerald' : 'rose', 'card-enter')}
+      ${metricCard('Receitas', currency.format(monthly.income), 'Entradas do mês', 'emerald', 'card-enter card-enter-delay-1')}
+      ${metricCard('Despesas', currency.format(monthly.expense), 'Saídas do mês', 'rose', 'card-enter card-enter-delay-2')}
+      ${metricCard('Investimentos', currency.format(monthly.investment), 'Total aportado', 'violet', 'card-enter card-enter-delay-3')}
     </section>
 
     <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.45fr_.95fr]">
       <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 class="text-xl font-semibold tracking-tight">Fluxo financeiro dos últimos 6 meses</h2>
-            <p class="mt-1 text-sm text-slate-400">Receitas, despesas e investimentos com leitura estável já no primeiro carregamento.</p>
-          </div>
-          <a href="#/transactions" class="btn-secondary">Ver transações</a>
-        </div>
+        ${dashboardSectionHeader('Fluxo financeiro', 'Últimos 6 meses', '#/transactions', 'Ver transações')}
         <div class="chart-frame mt-6">
           <canvas id="dashboardFlowChart"></canvas>
         </div>
       </article>
 
-      <div class="grid grid-cols-1 gap-6">
-        ${infoCard('Taxa de poupança', `${monthly.savingsRate.toFixed(1)}%`, 'Regra: (receitas - despesas) / receitas.', 'emerald')}
-        ${infoCard('Saldo líquido mensal', currency.format(monthly.netCashFlow), 'Receitas menos despesas e investimentos.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
-        ${infoCard('Patrimônio financeiro', currency.format(position.netWorth), 'Saldo disponível + total aportado em investimentos.', 'violet')}
-        ${infoCard('Contas vencendo em 7 dias', `${dueSoon.length} item(ns)`, dueSoon.length ? `Pendente previsto: ${currency.format(sumAmount(dueSoon))}` : 'Nenhuma conta próxima do vencimento.', 'rose')}
-        ${infoCard('Assinaturas pendentes', currency.format(pendingTotal), `${pendingSubscriptions.length} obrigação(ões) ainda não realizadas.`, pendingTotal ? 'rose' : 'emerald')}
+      <div class="grid grid-cols-1 gap-4">
+        ${infoCard('Poupança', `${monthly.savingsRate.toFixed(1)}%`, `Você poupou ${monthly.savingsRate.toFixed(1)}% da receita este mês.`, 'emerald')}
+        ${infoCard('Saldo líquido', currency.format(monthly.netCashFlow), 'Receitas menos despesas e investimentos.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
+        ${infoCard('Patrimônio', currency.format(position.netWorth), `Patrimônio atual: ${currency.format(position.netWorth)}.`, 'violet')}
+        ${infoCard('Próximos vencimentos', `${dueSoon.length}`, dueSoon.length ? `${currency.format(sumAmount(dueSoon))} previstos em 7 dias.` : 'Nenhuma conta vence nos próximos 7 dias.', dueSoon.length ? 'rose' : 'emerald')}
+        ${infoCard('Assinaturas', currency.format(pendingTotal), pendingSubscriptions.length ? `${pendingSubscriptions.length} pendente(s) no período.` : 'Recorrências em dia.', pendingTotal ? 'rose' : 'emerald')}
         <article class="glass rounded-[28px] p-5 hover-lift">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h3 class="text-lg font-semibold tracking-tight">Uso dos orçamentos</h3>
-              <p class="mt-1 text-sm text-slate-400">Visão geral dos limites mensais por categoria.</p>
+              <h3 class="text-lg font-semibold tracking-tight">Orçamentos</h3>
+              <p class="mt-1 text-sm text-slate-400">Uso dos limites mensais.</p>
             </div>
             <span class="tag ${budgetPct > 90 ? 'tag-rose' : 'tag-emerald'}">${budgetPct.toFixed(0)}%</span>
           </div>
@@ -676,14 +790,15 @@ function renderDashboardPage() {
       </div>
     </section>
 
+    <section class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      ${dashboardAccountSummary('Saldo em contas', currency.format(accountSummary.includedBalance), 'Contas no saldo total', getTopAccountForDashboard(), 'accounts')}
+      ${dashboardAccountSummary('Gasto em cartões', currency.format(accountSummary.creditCardSpending), 'Fatura estimada do mês', getTopCreditCardForDashboard(), 'credit')}
+      ${dashboardAccountSummary('Método mais usado', accountSummary.topMethod?.label || 'Sem dados', accountSummary.topMethod ? currency.format(accountSummary.topMethod.amount) : 'N/A', accountSummary.topMethod, 'method')}
+      ${dashboardAccountSummary('Contas ativas', `${accountSummary.activeAccounts}`, 'Disponíveis para transações', null, 'active')}
+    </section>
+
     <section class="mt-6 glass rounded-[30px] p-5 sm:p-6 hover-lift">
-      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 class="text-xl font-semibold tracking-tight">Insights financeiros</h2>
-          <p class="mt-1 text-sm text-slate-400">Leituras automáticas com a mesma regra usada nos relatórios.</p>
-        </div>
-        <a href="#/reports" class="btn-secondary">Ver relatórios</a>
-      </div>
+      ${dashboardSectionHeader('Insights', 'Leituras rápidas do mês', '#/reports', 'Ver relatórios')}
       <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         ${insights.map(renderInsightCard).join('')}
       </div>
@@ -691,25 +806,14 @@ function renderDashboardPage() {
 
     <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_.9fr]">
       <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <h2 class="text-xl font-semibold tracking-tight">Últimas movimentações</h2>
-            <p class="mt-1 text-sm text-slate-400">Atividade recente do seu fluxo financeiro.</p>
-          </div>
-          <a href="#/transactions" class="btn-secondary">Adicionar nova</a>
-        </div>
+        ${dashboardSectionHeader('Últimas movimentações', 'Atividade recente', '#/transactions', 'Adicionar nova')}
         <div class="mt-5 space-y-3">
           ${recent.length ? recent.map(renderTransactionListItem).join('') : emptyState('Ainda não existem movimentações.')}
         </div>
       </article>
 
       <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <h2 class="text-xl font-semibold tracking-tight">Resumo de prioridades</h2>
-            <p class="mt-1 text-sm text-slate-400">Atalhos para o que merece atenção agora.</p>
-          </div>
-        </div>
+        ${dashboardSectionHeader('Prioridades', 'Atalhos importantes')}
         <div class="mt-5 grid gap-4">
           ${priorityCard('Meta principal', `${state.goal.name}`, `${getGoalProgress().progress.toFixed(0)}% concluído`, '#/goals')}
           ${priorityCard('Planejamento', `Crescimento em foco`, `Patrimônio projetado: ${currency.format(compoundProjection().futureValue)}`, '#/calculator')}
@@ -727,21 +831,46 @@ function renderDashboardPage() {
 
 function metricCard(title, value, subtitle, tone, enterClass = '') {
   const ring = {
-    emerald: 'from-emerald-500/15 to-emerald-400/10 text-emerald-300',
-    rose: 'from-rose-500/15 to-rose-400/10 text-rose-300',
-    violet: 'from-violet-500/15 to-violet-400/10 text-violet-300'
-  }[tone] || 'from-white/10 to-white/5 text-slate-200';
+    emerald: 'tag-emerald',
+    rose: 'tag-rose',
+    violet: 'tag-violet'
+  }[tone] || 'tag-slate';
+  const iconName = getMetricIcon(title, tone);
 
   return `
     <article class="glass metric-ring rounded-[28px] p-5 hover-lift ${enterClass}">
       <div class="flex items-center justify-between gap-3">
-        <span class="text-sm text-slate-300">${title}</span>
-        <span class="rounded-full bg-gradient-to-br ${ring} px-3 py-1 text-xs font-semibold">${tone === 'rose' ? 'Atenção' : 'Live'}</span>
+        <span class="flex items-center gap-2 text-sm text-slate-300"><span class="metric-icon ${ring}">${icon(iconName, 'h-4 w-4')}</span>${title}</span>
+        <span class="tag ${ring}">${tone === 'rose' ? 'Monitorar' : 'Mês'}</span>
       </div>
       <p class="mt-4 text-3xl font-semibold tracking-tight">${value}</p>
       <p class="mt-2 text-sm text-slate-400">${subtitle}</p>
     </article>
   `;
+}
+
+function dashboardSectionHeader(title, subtitle, href = '', actionLabel = '') {
+  return `
+    <div class="dashboard-section-header">
+      <div class="min-w-0">
+        <h2 class="truncate text-lg font-semibold tracking-tight text-slate-50">${escapeHtml(title)}</h2>
+        <p class="mt-0.5 truncate text-sm text-slate-400">${escapeHtml(subtitle || '')}</p>
+      </div>
+      ${href && actionLabel ? `<a href="${href}" class="btn-secondary compact-action">${escapeHtml(actionLabel)}</a>` : ''}
+    </div>
+  `;
+}
+
+function getMetricIcon(title, tone) {
+  const text = normalizeText(title);
+  if (text.includes('cartao') || text.includes('fatura')) return domainIcons.credit;
+  if (text.includes('conta') || text.includes('saldo')) return domainIcons.accounts;
+  if (text.includes('metodo')) return domainIcons.pix;
+  if (text.includes('banco')) return 'landmark';
+  if (text.includes('receita')) return 'trending-up';
+  if (text.includes('despesa') || tone === 'rose') return 'trending-down';
+  if (text.includes('invest')) return domainIcons.investment;
+  return tone === 'emerald' ? 'circle-check' : tone === 'violet' ? 'sparkles' : 'activity';
 }
 
 function infoCard(title, value, subtitle, tone) {
@@ -772,6 +901,27 @@ function renderInsightCard(insight) {
       <span class="tag ${toneClass}">${escapeHtml(insight.label)}</span>
       <h3 class="mt-3 text-base font-semibold tracking-tight">${escapeHtml(insight.title)}</h3>
       <p class="mt-2 text-sm leading-relaxed text-slate-400">${escapeHtml(insight.description)}</p>
+    </article>
+  `;
+}
+
+function dashboardAccountSummary(title, value, subtitle, entity, kind) {
+  const account = entity?.account || (entity?.id ? getAccountById(entity.id) : null);
+  const institution = entity?.institution || getInstitutionById(account?.institutionId);
+  const method = kind === 'method' ? getPaymentMethods().find((item) => item.name === entity?.label || shortPaymentMethodLabel(item) === entity?.label) : null;
+  return `
+    <article class="dashboard-account-summary hover-lift" style="${institutionStyleVars(institution, account?.color)}">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-sm text-slate-300">${escapeHtml(title)}</p>
+          <p class="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-50">${escapeHtml(value)}</p>
+          <p class="mt-1 text-sm text-slate-500">${escapeHtml(subtitle)}</p>
+        </div>
+        ${method ? `<span class="method-avatar" style="--method-color:${escapeHtml(method.color || '#94a3b8')}">${paymentMethodIcon(method.id, 'h-4 w-4')}</span>` : institutionAvatar(institution, 'h-10 w-10')}
+      </div>
+      <div class="mt-4">
+        ${account ? accountOriginBadge(account, institution) : method ? paymentMethodBadge(method.id) : '<span class="source-badge">Sem destaque</span>'}
+      </div>
     </article>
   `;
 }
@@ -820,14 +970,8 @@ function renderDashboardWeekDay(day) {
       </div>
       <div class="mt-4 space-y-2 text-xs">
         ${items.length ? items.slice(0, 3).map((item) => `
-          <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-3 py-2">
-            <div class="truncate font-medium text-slate-100">${escapeHtml(item.title)}</div>
-            <div class="mt-1 flex items-center justify-between gap-2 text-slate-400">
-              <span class="truncate">${escapeHtml(item.category || item.typeLabel || 'Agenda')}</span>
-              <span>${currency.format(item.amount)}</span>
-            </div>
-          </div>
-        `).join('') : '<div class="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-center text-slate-500">Sem itens</div>'}
+          ${calendarTransactionPill(item, false)}
+        `).join('') : '<div class="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-4 text-center text-slate-500">Sem itens</div>'}
       </div>
     </article>
   `;
@@ -835,11 +979,16 @@ function renderDashboardWeekDay(day) {
 
 function renderTransactionsPage() {
   const categories = getAvailableCategories();
-  const selectedCategory = valueOf('draftTransactionCategory', categories[0] || 'Outros');
+  const editingTransaction = state.transactions.find((tx) => tx.id === valueOf('editingTransactionId', '')) || null;
+  const selectedCategory = editingTransaction?.category || valueOf('draftTransactionCategory', categories[0] || 'Outros');
   const isCustomCategory = selectedCategory === '__custom__';
   const transactions = filterTransactions({
     type: valueOf('filterType', 'all'),
     recurring: valueOf('filterRecurring', 'all'),
+    financialAccountId: valueOf('filterFinancialAccount', 'all'),
+    institutionId: valueOf('filterInstitution', 'all'),
+    paymentMethodId: valueOf('filterPaymentMethod', 'all'),
+    cardBrand: valueOf('filterCardBrand', 'all'),
     search: valueOf('searchTransaction', ''),
     month: valueOf('filterMonth', localISO(new Date()).slice(0, 7))
   });
@@ -857,29 +1006,30 @@ function renderTransactionsPage() {
       <section class="grid grid-cols-1 gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
         <article class="glass rounded-[28px] p-5 sm:p-6">
           <div class="flex items-start gap-3">
-            <span class="feature-icon feature-icon-violet">${icon('plus', 'h-5 w-5')}</span>
+            <span class="feature-icon feature-icon-violet">${icon(editingTransaction ? 'pencil' : 'plus', 'h-5 w-5')}</span>
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Nova movimentação</p>
-              <h2 class="mt-2 text-xl font-semibold tracking-tight">Adicionar transação</h2>
+              <p class="text-xs uppercase tracking-[0.24em] text-slate-400">${editingTransaction ? 'Editar movimentação' : 'Nova movimentação'}</p>
+              <h2 class="mt-2 text-xl font-semibold tracking-tight">${editingTransaction ? 'Alterar transação' : 'Adicionar transação'}</h2>
             </div>
+            ${editingTransaction ? `<button class="btn-secondary ml-auto h-10 w-10 p-0" data-cancel-transaction-edit aria-label="Cancelar edição">${icon('x', 'h-4 w-4')}</button>` : ''}
           </div>
 
-          <form id="transactionForm" class="mt-6 space-y-4">
+          <form id="transactionForm" class="mt-6 space-y-4" data-editing-transaction-id="${editingTransaction?.id || ''}">
             <div>
               <label class="mb-2 block text-sm text-slate-300">Descrição</label>
-              <input class="input-luxury" name="description" required placeholder="Ex.: Compra no mercado" autocomplete="off" />
+              <input class="input-luxury" name="description" value="${escapeHtml(editingTransaction?.description || '')}" required placeholder="Ex.: Compra no mercado" autocomplete="off" />
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="mb-2 block text-sm text-slate-300">Valor</label>
                 <div class="money-input-wrap">
                   <span>R$</span>
-                  <input class="input-luxury money-input" name="amount" inputmode="decimal" required placeholder="0,00" />
+                  <input class="input-luxury money-input" name="amount" value="${editingTransaction ? formatMoneyInput(editingTransaction.amount) : ''}" inputmode="decimal" required placeholder="0,00" />
                 </div>
               </div>
               <div>
                 <label class="mb-2 block text-sm text-slate-300">Data</label>
-                <input class="input-luxury" name="date" type="date" value="${localISO(new Date())}" required />
+                <input class="input-luxury" name="date" type="date" value="${editingTransaction?.date || localISO(new Date())}" required />
               </div>
             </div>
 
@@ -888,9 +1038,11 @@ function renderTransactionsPage() {
                 <label class="mb-2 block text-sm text-slate-300">Tipo</label>
                 <div class="select-wrap">
                   <select class="select-luxury" name="type">
-                    <option value="income">Receita</option>
-                    <option value="expense" selected>Despesa</option>
-                    <option value="investment">Investimento</option>
+                    ${selectOptions([
+                      ['income', 'Receita'],
+                      ['expense', 'Despesa'],
+                      ['investment', 'Investimento']
+                    ], editingTransaction?.type || 'expense')}
                   </select>
                 </div>
               </div>
@@ -909,12 +1061,31 @@ function renderTransactionsPage() {
               <input class="input-luxury" id="transactionCustomCategory" name="customCategory" placeholder="Ex.: Pets, Viagem, Casa" ${isCustomCategory ? 'required' : ''} />
             </div>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Conta/Cartão</label>
+                <div class="select-wrap">
+                  <select class="select-luxury" id="transactionFinancialAccount" name="financialAccountId">
+                    ${renderFinancialAccountOptions(editingTransaction?.financialAccountId || '', true)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Método</label>
+                <div class="select-wrap">
+                  <select class="select-luxury" id="transactionPaymentMethod" name="paymentMethodId">
+                    ${renderPaymentMethodOptions(editingTransaction?.paymentMethodId || '', true)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <label class="inline-flex items-center gap-3 text-sm text-slate-300">
-              <input name="recurring" type="checkbox" class="h-4 w-4 rounded border-white/20 bg-slate-900/60" />
+              <input name="recurring" type="checkbox" class="h-4 w-4 rounded border-white/20 bg-slate-900/60" ${editingTransaction?.recurring ? 'checked' : ''} />
               Marcar como recorrente
             </label>
 
-            <button class="btn-primary w-full" type="submit">${icon('save', 'h-4 w-4')} Salvar transação</button>
+            <button class="btn-primary w-full" type="submit">${icon('save', 'h-4 w-4')} ${editingTransaction ? 'Salvar alterações' : 'Salvar transação'}</button>
           </form>
         </article>
 
@@ -952,6 +1123,26 @@ function renderTransactionsPage() {
                   ], valueOf('filterRecurring', 'all'))}
                 </select>
               </div>
+              <div class="select-wrap">
+                <select id="filterFinancialAccount" class="select-luxury">
+                  ${renderFinancialAccountFilterOptions(valueOf('filterFinancialAccount', 'all'))}
+                </select>
+              </div>
+              <div class="select-wrap">
+                <select id="filterInstitution" class="select-luxury">
+                  ${renderInstitutionFilterOptions(valueOf('filterInstitution', 'all'))}
+                </select>
+              </div>
+              <div class="select-wrap">
+                <select id="filterPaymentMethod" class="select-luxury">
+                  ${renderPaymentMethodFilterOptions(valueOf('filterPaymentMethod', 'all'))}
+                </select>
+              </div>
+              <div class="select-wrap">
+                <select id="filterCardBrand" class="select-luxury">
+                  ${selectOptions([['all', 'Todas bandeiras'], ...cardBrandOptions.filter(([value]) => value)], valueOf('filterCardBrand', 'all'))}
+                </select>
+              </div>
               <input id="filterMonth" class="input-luxury" type="month" value="${valueOf('filterMonth', localISO(new Date()).slice(0, 7))}" />
             </div>
           </div>
@@ -967,6 +1158,7 @@ function renderTransactionsPage() {
                   <tr>
                     <th class="px-4 py-3 font-medium">Descrição</th>
                     <th class="px-4 py-3 font-medium">Categoria</th>
+                    <th class="px-4 py-3 font-medium">Origem</th>
                     <th class="px-4 py-3 font-medium">Data</th>
                     <th class="px-4 py-3 font-medium">Tipo</th>
                     <th class="px-4 py-3 font-medium text-right">Valor</th>
@@ -974,12 +1166,179 @@ function renderTransactionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  ${transactions.length ? transactions.map(renderTransactionRow).join('') : `<tr><td colspan="6" class="px-4 py-12 text-center text-slate-400">Nenhuma transação encontrada para os filtros atuais.</td></tr>`}
+                  ${transactions.length ? transactions.map(renderTransactionRow).join('') : `<tr><td colspan="7" class="px-4 py-12 text-center text-slate-400">Nenhuma transação encontrada para os filtros atuais.</td></tr>`}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
+        </article>
+      </section>
+    </section>
+  `;
+}
+
+function renderAccountsPage() {
+  const accounts = filterFinancialAccounts({
+    type: valueOf('filterAccountType', 'all'),
+    institutionId: valueOf('filterAccountInstitution', 'all'),
+    status: valueOf('filterAccountStatus', 'active'),
+    paymentMethodId: valueOf('filterAccountMethod', 'all'),
+    search: valueOf('searchAccount', '')
+  });
+  const editingAccount = state.financialAccounts.find((account) => account.id === valueOf('editingAccountId', '')) || null;
+  const selectedPreset = quickAccountPresets.find((preset) => preset.label === valueOf('selectedAccountPreset', '')) || null;
+  const draft = editingAccount || buildAccountDraftFromPreset(selectedPreset);
+  const summary = getPaymentSourceSummary();
+
+  return `
+    <section class="space-y-6">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        ${metricCard('Contas ativas', `${summary.activeAccounts}`, 'Contas, cartões e carteiras em uso.', 'emerald')}
+        ${metricCard('Saldo incluído', currency.format(summary.includedBalance), 'Saldo calculado das contas no total.', summary.includedBalance >= 0 ? 'emerald' : 'rose')}
+        ${metricCard('Fatura estimada', currency.format(summary.creditCardSpending), 'Gasto do mês em cartões de crédito.', summary.creditCardSpending ? 'rose' : 'emerald')}
+        ${metricCard('Banco mais movimentado', summary.topInstitution?.label || 'Sem dados', summary.topInstitution ? currency.format(summary.topInstitution.amount) : 'N/A', 'violet')}
+      </div>
+
+      <section class="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+        <article class="glass rounded-[28px] p-5 sm:p-6">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3">
+              <span class="feature-icon feature-icon-violet">${icon(editingAccount ? 'pencil' : 'plus', 'h-5 w-5')}</span>
+              <div>
+                <p class="text-xs uppercase tracking-[0.24em] text-slate-400">${editingAccount ? 'Editar origem' : 'Novo modelo'}</p>
+                <h2 class="mt-2 text-xl font-semibold tracking-tight">${editingAccount ? 'Ajustar conta/cartão' : 'Adicionar conta/cartão'}</h2>
+              </div>
+            </div>
+            ${editingAccount ? `<button class="btn-secondary h-10 w-10 p-0" data-cancel-account-edit aria-label="Cancelar edição">${icon('x', 'h-4 w-4')}</button>` : ''}
+          </div>
+
+          <div class="mt-5">
+            <label class="mb-2 block text-sm text-slate-300">Preset rápido</label>
+            <div class="select-wrap">
+              <select class="select-luxury" id="selectedAccountPreset">
+                ${selectOptions([['', 'Configuração manual'], ...quickAccountPresets.map((preset) => [preset.label, preset.label])], selectedPreset?.label || '')}
+              </select>
+            </div>
+            <div class="preset-strip mt-3">
+              ${quickAccountPresets.slice(0, 8).map(renderQuickPresetChip).join('')}
+            </div>
+          </div>
+
+          <form id="financialAccountForm" class="mt-6 space-y-4" data-editing-account-id="${editingAccount?.id || ''}">
+            <div>
+              <label class="mb-2 block text-sm text-slate-300">Instituição</label>
+              <div class="select-wrap">
+                <select class="select-luxury" name="institutionId">
+                  ${renderInstitutionOptions(draft.institutionId, true)}
+                </select>
+              </div>
+              ${institutionSelectPreview(draft.institutionId)}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Tipo</label>
+                <div class="select-wrap">
+                  <select class="select-luxury" name="type">
+                    ${selectOptions(accountTypeOptions, draft.type || 'checking_account')}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Apelido</label>
+                <input class="input-luxury" name="nickname" value="${escapeHtml(draft.nickname || '')}" placeholder="Ex.: Nubank Roxinho" required />
+              </div>
+            </div>
+            <div>
+              <label class="mb-2 block text-sm text-slate-300">Nome oficial</label>
+              <input class="input-luxury" name="name" value="${escapeHtml(draft.name || '')}" placeholder="Ex.: Nubank Crédito" required />
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Final</label>
+                <input class="input-luxury" name="lastFourDigits" value="${escapeHtml(draft.lastFourDigits || '')}" inputmode="numeric" maxlength="4" placeholder="1234" />
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Bandeira</label>
+                <div class="select-wrap">
+                  <select class="select-luxury" name="cardBrand">
+                    ${selectOptions(cardBrandOptions, draft.cardBrand || '')}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Cor</label>
+                <input class="input-luxury" name="color" type="color" value="${escapeHtml(draft.color || getInstitutionById(draft.institutionId)?.brandColor || '#8b7cf6')}" />
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Saldo inicial</label>
+                <div class="money-input-wrap"><span>R$</span><input class="input-luxury money-input" name="initialBalance" value="${formatMoneyInput(draft.initialBalance || 0)}" inputmode="decimal" /></div>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Limite</label>
+                <div class="money-input-wrap"><span>R$</span><input class="input-luxury money-input" name="creditLimit" value="${draft.creditLimit ? formatMoneyInput(draft.creditLimit) : ''}" inputmode="decimal" /></div>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Saldo manual</label>
+                <div class="money-input-wrap"><span>R$</span><input class="input-luxury money-input" name="manualBalance" value="${draft.manualBalance !== null && draft.manualBalance !== undefined ? formatMoneyInput(draft.manualBalance) : ''}" inputmode="decimal" /></div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Fechamento</label>
+                <input class="input-luxury" name="closingDay" type="number" min="1" max="31" value="${draft.closingDay || ''}" />
+              </div>
+              <div>
+                <label class="mb-2 block text-sm text-slate-300">Vencimento</label>
+                <input class="input-luxury" name="dueDay" type="number" min="1" max="31" value="${draft.dueDay || ''}" />
+              </div>
+            </div>
+            <div>
+              <label class="mb-3 block text-sm text-slate-300">Métodos aceitos</label>
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                ${getPaymentMethods().map((method) => `
+                  <label class="method-check">
+                    <input type="checkbox" name="paymentMethodIds" value="${method.id}" ${draft.paymentMethodIds?.includes(method.id) ? 'checked' : ''} />
+                    ${paymentMethodBadge(method.id)}
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+            ${draft.type === 'credit_card' || draft.type === 'debit_card' || draft.type === 'prepaid_card' ? renderCreditCardPreview({ ...draft, isActive: true }) : ''}
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                <input name="includeInTotalBalance" type="checkbox" class="h-4 w-4 rounded border-white/20 bg-slate-900/60" ${draft.includeInTotalBalance !== false ? 'checked' : ''} />
+                Inclui no saldo
+              </label>
+              <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                <input name="isDefault" type="checkbox" class="h-4 w-4 rounded border-white/20 bg-slate-900/60" ${draft.isDefault ? 'checked' : ''} />
+                Conta padrão
+              </label>
+            </div>
+            <textarea class="textarea-luxury min-h-24" name="notes" placeholder="Observações internas">${escapeHtml(draft.notes || '')}</textarea>
+            <button class="btn-primary w-full" type="submit">${icon('save', 'h-4 w-4')} ${editingAccount ? 'Salvar alterações' : 'Adicionar conta/cartão'}</button>
+          </form>
+        </article>
+
+        <article class="glass rounded-[28px] p-5 sm:p-6 min-w-0">
+          <div class="flex flex-col gap-4">
+            <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Origem financeira</p>
+              <h2 class="mt-2 text-xl font-semibold tracking-tight">Contas, cartões e carteiras</h2>
+            </div>
+            <div class="transaction-toolbar">
+              <div class="toolbar-search">${icon('search', 'h-4 w-4')}<input id="searchAccount" value="${escapeHtml(valueOf('searchAccount', ''))}" placeholder="Buscar nome, banco ou apelido..." /></div>
+              <div class="select-wrap"><select id="filterAccountType" class="select-luxury">${selectOptions([['all', 'Todos os tipos'], ...accountTypeOptions], valueOf('filterAccountType', 'all'))}</select></div>
+              <div class="select-wrap"><select id="filterAccountInstitution" class="select-luxury">${renderInstitutionFilterOptions(valueOf('filterAccountInstitution', 'all'))}</select></div>
+              <div class="select-wrap"><select id="filterAccountMethod" class="select-luxury">${renderPaymentMethodFilterOptions(valueOf('filterAccountMethod', 'all'))}</select></div>
+              <div class="select-wrap"><select id="filterAccountStatus" class="select-luxury">${selectOptions([['active', 'Ativos'], ['archived', 'Arquivados'], ['all', 'Todos']], valueOf('filterAccountStatus', 'active'))}</select></div>
+            </div>
+          </div>
+          <div class="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            ${accounts.length ? accounts.map(renderFinancialAccountCard).join('') : emptyState('Nenhuma conta/cartão encontrada. Ative um preset ou crie uma origem financeira manual.')}
+          </div>
         </article>
       </section>
     </section>
@@ -1046,7 +1405,7 @@ function renderGoalsPage() {
           </div>
 
           <div class="mt-6 progress-track h-4">
-            <div class="progress-bar bg-gradient-to-r from-emerald-400 via-violet-400 to-violet-500" style="width:${Math.min(100, goal.progress)}%"></div>
+            <div class="progress-bar bg-violet-400" style="width:${Math.min(100, goal.progress)}%"></div>
           </div>
 
           <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
@@ -1219,7 +1578,7 @@ function buildCalendar(baseDate) {
   const cells = [];
 
   for (let blank = 0; blank < firstDay; blank += 1) {
-    cells.push('<div class="rounded-[24px] border border-dashed border-white/8 bg-white/[0.02]"></div>');
+    cells.push('<div class="rounded-[24px] border border-white/8 bg-white/[0.02]" aria-hidden="true"></div>');
   }
 
   for (let day = 1; day <= totalDays; day += 1) {
@@ -1240,14 +1599,8 @@ function buildCalendar(baseDate) {
 
         <div class="mt-3 space-y-2 text-xs">
           ${items.slice(0, 3).map((item) => `
-            <div class="rounded-2xl border px-2.5 py-2 ${scheduleToneClass(item.tone)}">
-              <div class="truncate font-medium">${escapeHtml(item.title)}</div>
-              <div class="mt-1 flex items-center justify-between gap-2 text-slate-400">
-                <span class="truncate">${escapeHtml(item.category || item.typeLabel || 'Agenda')}</span>
-                <span>${currency.format(item.amount)}</span>
-              </div>
-            </div>
-          `).join('') || '<div class="text-slate-500">Sem vencimentos</div>'}
+            ${calendarTransactionPill(item, true)}
+          `).join('') || '<div class="text-slate-500">Livre</div>'}
           ${items.length > 3 ? `<div class="text-slate-500">+ ${items.length - 3} item(ns)</div>` : ''}
         </div>
       </article>
@@ -1279,7 +1632,7 @@ function renderCalendarDayDetails(dateIso) {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="truncate font-semibold text-slate-100">${escapeHtml(item.title)}</p>
-                <p class="mt-1 text-sm text-slate-400">${escapeHtml(item.category || item.typeLabel || 'Agenda')} • ${escapeHtml(item.typeLabel || '')}</p>
+                <div class="mt-2">${transactionOriginCell(item, true)}</div>
               </div>
               <strong class="shrink-0 text-sm">${currency.format(item.amount)}</strong>
             </div>
@@ -1320,13 +1673,7 @@ function buildCalendarMobileAgenda(baseDate) {
         ` : ''}
         <div class="mt-4 space-y-2 text-sm">
           ${dayItems.length ? dayItems.slice(0, 4).map((item) => `
-            <div class="rounded-2xl border px-3 py-2 ${scheduleToneClass(item.tone)}">
-              <div class="truncate font-medium text-slate-100">${escapeHtml(item.title)}</div>
-              <div class="mt-1 flex items-center justify-between gap-2 text-xs text-slate-400">
-                <span class="truncate">${escapeHtml(item.category || item.typeLabel || 'Agenda')}</span>
-                <span>${currency.format(item.amount)}</span>
-              </div>
-            </div>
+            ${calendarTransactionPill(item, false)}
           `).join('') : '<div class="text-sm text-slate-500">Sem movimentações neste dia.</div>'}
         </div>
       </article>
@@ -1538,6 +1885,7 @@ function getSubscriptionStatusMeta(status) {
 
 function renderReportsPage() {
   const insights = getReportInsights();
+  const sourceSummary = getPaymentSourceSummary();
   return `
     <section class="grid grid-cols-1 gap-6">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -1568,7 +1916,42 @@ function renderReportsPage() {
           </div>
         </article>
       </section>
+
+      <section class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="text-xl font-semibold tracking-tight">Contas, cartões e métodos</h2>
+            <p class="mt-1 text-sm text-slate-400">Relatórios individuais por origem financeira sem misturar método de pagamento com conta/cartão.</p>
+          </div>
+          <a href="#/accounts" class="btn-secondary">${icon('wallet-cards', 'h-4 w-4')} Gerenciar</a>
+        </div>
+        <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          ${renderPaymentSourceReportCard('Gastos por cartão', sourceSummary.creditCards)}
+          ${renderPaymentSourceReportCard('Gastos por conta', sourceSummary.accounts)}
+          ${renderPaymentSourceReportCard('Gastos por método', sourceSummary.methods)}
+          ${renderPaymentSourceReportCard('Receitas por conta', sourceSummary.incomeAccounts)}
+          ${renderPaymentSourceReportCard('Investimentos por conta/corretora', sourceSummary.investmentAccounts)}
+          ${renderPaymentSourceReportCard('Ranking de instituições', sourceSummary.institutions)}
+        </div>
+      </section>
     </section>
+  `;
+}
+
+function renderPaymentSourceReportCard(title, rows) {
+  const list = (rows || []).slice(0, 5);
+  return `
+    <article class="rounded-[24px] border border-white/10 bg-white/5 p-4">
+      <h3 class="text-base font-semibold tracking-tight">${escapeHtml(title)}</h3>
+      <div class="mt-4 space-y-3">
+        ${list.length ? list.map((row) => `
+          <div class="report-source-row">
+            <span class="min-w-0">${renderReportEntity(row, title)}</span>
+            <strong class="shrink-0 text-slate-100">${currency.format(row.amount)}</strong>
+          </div>
+        `).join('') : '<p class="text-sm text-slate-500">Sem dados suficientes no período.</p>'}
+      </div>
+    </article>
   `;
 }
 
@@ -1660,11 +2043,60 @@ function renderTransactionListItem(tx) {
             <h3 class="font-semibold">${escapeHtml(tx.description)}</h3>
             ${typeBadge(tx.type)}
           </div>
-          <p class="mt-1 text-sm text-slate-400">${escapeHtml(tx.category)} • ${formatDate(tx.date)}${tx.recurring ? ' • recorrente' : ''}</p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <span class="text-sm text-slate-400">${escapeHtml(tx.category)} • ${formatDate(tx.date)}${tx.recurring ? ' • recorrente' : ''}</span>
+            ${compactOriginPill(tx)}
+          </div>
         </div>
         <div class="text-right font-semibold ${tx.type === 'income' ? 'text-emerald-300' : tx.type === 'investment' ? 'text-violet-300' : 'text-rose-300'}">${currency.format(tx.amount)}</div>
       </div>
     </div>
+  `;
+}
+
+function renderFinancialAccountCard(account) {
+  const institution = getInstitutionById(account.institutionId);
+  const stats = getAccountStats(account);
+  const isCredit = account.type === 'credit_card';
+  const isCard = ['credit_card', 'debit_card', 'prepaid_card', 'benefits_card'].includes(account.type);
+  const available = isCredit && account.creditLimit ? Math.max(0, account.creditLimit - stats.monthExpense) : null;
+  const canDelete = !state.transactions.some((tx) => tx.financialAccountId === account.id);
+  if (isCard) {
+    return renderCreditCardPreview(account, { stats, available, canDelete, interactive: true });
+  }
+  return `
+    <article class="account-card bank-account-card rounded-[22px] border border-white/10 bg-white/5 p-4" style="${institutionStyleVars(institution, account.color)}">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
+          ${institutionAvatar(institution, 'h-11 w-11')}
+          <div class="min-w-0">
+            <h3 class="truncate text-base font-semibold text-slate-50">${escapeHtml(account.nickname || account.name)}</h3>
+            <p class="mt-1 truncate text-sm text-slate-400">${escapeHtml(institution?.name || 'Instituição opcional')} • ${escapeHtml(getAccountTypeLabel(account.type))}${account.lastFourDigits ? ` • final ${escapeHtml(account.lastFourDigits)}` : ''}</p>
+          </div>
+        </div>
+        <span class="tag ${account.isActive ? 'tag-emerald' : 'tag-slate'}">${account.isActive ? 'Ativa' : 'Arquivada'}</span>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <div class="rounded-2xl border border-white/10 bg-slate-950/25 p-3">
+          <p class="text-xs text-slate-500">${isCredit ? 'Gasto no mês' : 'Saldo calculado'}</p>
+          <p class="mt-1 text-base font-semibold ${isCredit ? 'text-rose-200' : 'text-slate-100'}">${currency.format(isCredit ? stats.monthExpense : stats.balance)}</p>
+        </div>
+        <div class="rounded-2xl border border-white/10 bg-slate-950/25 p-3">
+          <p class="text-xs text-slate-500">${isCredit ? 'Disponível' : 'Movimentado'}</p>
+          <p class="mt-1 text-base font-semibold text-slate-100">${currency.format(isCredit ? (available ?? 0) : stats.monthVolume)}</p>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        ${account.includeInTotalBalance ? '<span class="tag tag-emerald">Inclui no saldo</span>' : ''}
+        ${account.cardBrand ? `<span class="tag tag-slate">${escapeHtml(account.cardBrand)}</span>` : ''}
+        ${account.paymentMethodIds?.slice(0, 3).map(paymentMethodBadge).join('') || '<span class="tag tag-slate">Sem métodos</span>'}
+      </div>
+      <div class="mt-4 flex flex-wrap justify-end gap-2">
+        <button class="btn-secondary min-h-10 px-3 py-2 text-sm" data-edit-account="${account.id}">${icon('pencil', 'h-3.5 w-3.5')} Editar</button>
+        ${account.isActive ? `<button class="btn-secondary min-h-10 px-3 py-2 text-sm" data-archive-account="${account.id}">${icon('archive', 'h-3.5 w-3.5')} Arquivar</button>` : `<button class="btn-secondary min-h-10 px-3 py-2 text-sm" data-restore-account="${account.id}">${icon('rotate-ccw', 'h-3.5 w-3.5')} Ativar</button>`}
+        ${canDelete ? `<button class="btn-danger h-10 w-10 p-0" data-delete-account="${account.id}" aria-label="Excluir conta">${icon('trash-2', 'h-4 w-4')}</button>` : ''}
+      </div>
+    </article>
   `;
 }
 
@@ -1685,12 +2117,16 @@ function renderTransactionRow(tx) {
         </div>
       </td>
       <td class="px-4 py-4">${categoryBadge(tx.category)}</td>
+      <td class="px-4 py-4">${transactionOriginCell(tx)}</td>
       <td class="px-4 py-4 text-slate-300">${formatDate(tx.date)}</td>
       <td class="px-4 py-4">${typeBadge(tx.type)}</td>
       <td class="px-4 py-4 text-right font-semibold ${typeMeta.textClass}">
         ${currency.format(tx.amount)}
       </td>
       <td class="px-4 py-4 text-right">
+        <button class="btn-secondary h-9 w-9 p-0" data-edit-transaction="${tx.id}" aria-label="Editar transação" title="Editar">
+          ${icon('pencil', 'h-4 w-4')}
+        </button>
         <button class="btn-danger h-9 w-9 p-0" data-delete-transaction="${tx.id}" aria-label="Excluir transação" title="Excluir">
           ${icon('trash-2', 'h-4 w-4')}
         </button>
@@ -1716,11 +2152,15 @@ function renderTransactionCard(tx) {
           <div class="mt-3 flex flex-wrap items-center gap-2">
             ${categoryBadge(tx.category)}
             ${typeBadge(tx.type)}
+            ${transactionOriginCell(tx, true)}
             <span class="tag tag-slate">${icon(tx.recurring ? 'repeat-2' : 'circle', 'h-3.5 w-3.5')} ${tx.recurring ? 'Recorrente' : 'Pontual'}</span>
           </div>
         </div>
       </div>
       <div class="mt-4 flex justify-end">
+        <button class="btn-secondary mr-2 min-h-11 px-4 py-2 text-sm" data-edit-transaction="${tx.id}" aria-label="Editar transação ${escapeHtml(tx.description)}">
+          ${icon('pencil', 'h-4 w-4')} Editar
+        </button>
         <button class="btn-danger min-h-11 px-4 py-2 text-sm" data-delete-transaction="${tx.id}" aria-label="Excluir transação ${escapeHtml(tx.description)}">
           ${icon('trash-2', 'h-4 w-4')} Excluir
         </button>
@@ -1740,7 +2180,7 @@ function priorityCard(title, value, subtitle, href) {
 }
 
 function emptyState(text) {
-  return `<div class="rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-10 text-center text-sm text-slate-400">${escapeHtml(text)}</div>`;
+  return `<div class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-10 text-center text-sm text-slate-400">${escapeHtml(text)}</div>`;
 }
 
 function typeBadge(type) {
@@ -1786,11 +2226,11 @@ function normalizeText(value) {
 }
 
 function scheduleToneClass(tone) {
-  if (tone === 'income') return 'border-emerald-400/20 bg-emerald-400/10';
-  if (tone === 'investment') return 'border-violet-400/20 bg-violet-400/10';
-  if (tone === 'subscription-pending') return 'border-sky-400/20 bg-sky-400/10';
-  if (tone === 'subscription-overdue') return 'border-rose-400/30 bg-rose-400/15';
-  return 'border-rose-400/20 bg-rose-400/10';
+  if (tone === 'income') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100';
+  if (tone === 'investment') return 'border-violet-400/20 bg-violet-400/10 text-violet-100';
+  if (tone === 'subscription-pending') return 'border-sky-400/20 bg-sky-400/10 text-sky-100';
+  if (tone === 'subscription-overdue') return 'border-rose-400/30 bg-rose-400/10 text-rose-100';
+  return 'border-rose-400/20 bg-rose-400/10 text-rose-100';
 }
 
 function selectOptions(options, currentValue) {
@@ -1906,6 +2346,9 @@ function bindRoute(route) {
     case 'transactions':
       bindTransactionsPage();
       break;
+    case 'accounts':
+      bindAccountsPage();
+      break;
     case 'goals':
       bindGoalsPage();
       break;
@@ -2017,6 +2460,7 @@ function bindTransactionsPage() {
   bindCategorySelect('transactionCategory', 'transactionCustomCategoryWrap', 'transactionCustomCategory', 'draftTransactionCategory');
   document.getElementById('transactionForm')?.addEventListener('submit', (event) => {
     event.preventDefault();
+    const editingId = String(event.currentTarget.dataset.editingTransactionId || '');
     const data = new FormData(event.currentTarget);
     const category = resolveCategoryValue({
       category: data.get('category'),
@@ -2028,17 +2472,25 @@ function bindTransactionsPage() {
       return;
     }
 
-    state.transactions.unshift({
-      id: uid(),
+    const nextTransaction = {
+      ...(state.transactions.find((tx) => tx.id === editingId) || {}),
+      id: editingId || uid(),
       description: String(data.get('description') || '').trim(),
       amount,
       date: String(data.get('date') || localISO(new Date())),
       type: String(data.get('type') || 'expense'),
       category,
-      recurring: Boolean(data.get('recurring'))
-    });
+      recurring: Boolean(data.get('recurring')),
+      financialAccountId: String(data.get('financialAccountId') || ''),
+      paymentMethodId: String(data.get('paymentMethodId') || '')
+    };
+
+    state.transactions = editingId
+      ? state.transactions.map((tx) => tx.id === editingId ? nextTransaction : tx)
+      : [nextTransaction, ...state.transactions];
 
     persistViewValue('draftTransactionCategory', category);
+    persistViewValue('editingTransactionId', '');
     saveState();
     render();
   });
@@ -2055,6 +2507,20 @@ function bindTransactionsPage() {
     persistViewValue('filterRecurring', event.target.value);
     render();
   });
+  ['filterFinancialAccount', 'filterInstitution', 'filterPaymentMethod', 'filterCardBrand'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', (event) => {
+      persistViewValue(id, event.target.value);
+      render();
+    });
+  });
+  document.getElementById('transactionFinancialAccount')?.addEventListener('change', (event) => {
+    const account = getAccountById(event.target.value);
+    const suggestedMethod = getSuggestedPaymentMethodId(account);
+    const methodSelect = document.getElementById('transactionPaymentMethod');
+    if (methodSelect && suggestedMethod) {
+      methodSelect.value = suggestedMethod;
+    }
+  });
   document.getElementById('filterMonth')?.addEventListener('change', (event) => {
     persistViewValue('filterMonth', event.target.value);
     render();
@@ -2069,10 +2535,138 @@ function bindTransactionsPage() {
     exportTransactionsCsv(transactions);
   });
 
+  document.querySelectorAll('[data-edit-transaction]').forEach((button) => {
+    button.addEventListener('click', () => {
+      persistViewValue('editingTransactionId', button.dataset.editTransaction);
+      render();
+    });
+  });
+  document.querySelector('[data-cancel-transaction-edit]')?.addEventListener('click', () => {
+    persistViewValue('editingTransactionId', '');
+    render();
+  });
+
   document.querySelectorAll('[data-delete-transaction]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!confirmAction('Excluir esta transação? Essa ação será salva na sua conta.')) return;
       state.transactions = state.transactions.filter((tx) => tx.id !== button.dataset.deleteTransaction);
+      saveState();
+      render();
+    });
+  });
+}
+
+function bindAccountsPage() {
+  ['selectedAccountPreset', 'searchAccount', 'filterAccountType', 'filterAccountInstitution', 'filterAccountMethod', 'filterAccountStatus'].forEach((id) => {
+    document.getElementById(id)?.addEventListener(id === 'searchAccount' ? 'input' : 'change', (event) => {
+      persistViewValue(id, event.target.value);
+      if (id === 'selectedAccountPreset') persistViewValue('editingAccountId', '');
+      render();
+    });
+  });
+  document.querySelectorAll('[data-preset-chip]').forEach((button) => {
+    button.addEventListener('click', () => {
+      persistViewValue('selectedAccountPreset', button.dataset.presetChip);
+      persistViewValue('editingAccountId', '');
+      render();
+    });
+  });
+
+  document.getElementById('financialAccountForm')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const editingId = String(form.dataset.editingAccountId || '');
+    const institution = getInstitutionById(data.get('institutionId'));
+    const type = String(data.get('type') || 'checking_account');
+    const nickname = String(data.get('nickname') || '').trim();
+    const name = String(data.get('name') || nickname || institution?.name || 'Conta financeira').trim();
+    if (!nickname || !name) {
+      showToast('Informe nome e apelido para a conta/cartão.', 'error', 'Conta inválida');
+      return;
+    }
+
+    const lastFourDigits = String(data.get('lastFourDigits') || '').replace(/\D/g, '').slice(0, 4);
+    const paymentMethodIds = data.getAll('paymentMethodIds').map(String);
+    const nextAccount = {
+      ...(state.financialAccounts.find((account) => account.id === editingId) || {}),
+      id: editingId || uid(),
+      institutionId: String(data.get('institutionId') || ''),
+      name,
+      nickname,
+      type,
+      subtype: '',
+      lastFourDigits,
+      cardBrand: String(data.get('cardBrand') || ''),
+      color: String(data.get('color') || institution?.brandColor || '#8b7cf6'),
+      icon: '',
+      initialBalance: readMoneyAmount(data.get('initialBalance')),
+      manualBalance: String(data.get('manualBalance') || '').trim() ? readMoneyAmount(data.get('manualBalance')) : null,
+      creditLimit: String(data.get('creditLimit') || '').trim() ? readMoneyAmount(data.get('creditLimit')) : null,
+      closingDay: normalizeDayInput(data.get('closingDay')),
+      dueDay: normalizeDayInput(data.get('dueDay')),
+      includeInTotalBalance: Boolean(data.get('includeInTotalBalance')),
+      isDefault: Boolean(data.get('isDefault')),
+      isActive: true,
+      archivedAt: '',
+      notes: String(data.get('notes') || '').trim(),
+      externalProvider: '',
+      externalAccountId: '',
+      externalItemId: '',
+      lastSyncAt: '',
+      syncStatus: '',
+      consentExpiresAt: '',
+      paymentMethodIds: paymentMethodIds.length ? paymentMethodIds : getDefaultPaymentMethodsForType(type)
+    };
+
+    state.financialAccounts = editingId
+      ? state.financialAccounts.map((account) => account.id === editingId ? nextAccount : account)
+      : [nextAccount, ...state.financialAccounts];
+
+    persistViewValue('editingAccountId', '');
+    persistViewValue('selectedAccountPreset', '');
+    saveState();
+    render();
+  });
+
+  document.querySelectorAll('[data-edit-account]').forEach((button) => {
+    button.addEventListener('click', () => {
+      persistViewValue('editingAccountId', button.dataset.editAccount);
+      persistViewValue('selectedAccountPreset', '');
+      render();
+    });
+  });
+  document.querySelector('[data-cancel-account-edit]')?.addEventListener('click', () => {
+    persistViewValue('editingAccountId', '');
+    render();
+  });
+  document.querySelectorAll('[data-archive-account]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.financialAccounts = state.financialAccounts.map((account) => account.id === button.dataset.archiveAccount
+        ? { ...account, isActive: false, archivedAt: new Date().toISOString() }
+        : account);
+      saveState();
+      render();
+    });
+  });
+  document.querySelectorAll('[data-restore-account]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.financialAccounts = state.financialAccounts.map((account) => account.id === button.dataset.restoreAccount
+        ? { ...account, isActive: true, archivedAt: '' }
+        : account);
+      saveState();
+      render();
+    });
+  });
+  document.querySelectorAll('[data-delete-account]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!confirmAction('Excluir esta conta/cartão?')) return;
+      const hasTransactions = state.transactions.some((tx) => tx.financialAccountId === button.dataset.deleteAccount);
+      if (hasTransactions) {
+        showToast('Esta conta já possui transações. Arquive para preservar o histórico.', 'info', 'Arquivamento recomendado');
+        return;
+      }
+      state.financialAccounts = state.financialAccounts.filter((account) => account.id !== button.dataset.deleteAccount);
       saveState();
       render();
     });
@@ -2261,6 +2855,7 @@ function bindBackupPage() {
     state = {
       ...getDefaultState(state.profile),
       transactions: [],
+      financialAccounts: [],
       budgets: [],
       subscriptions: []
     };
@@ -2313,14 +2908,17 @@ function exportBackup() {
 
 function exportTransactionsCsv(transactions) {
   const rows = [
-    ['data', 'descricao', 'categoria', 'tipo', 'valor', 'recorrente'],
+    ['data', 'descricao', 'categoria', 'tipo', 'valor', 'recorrente', 'conta_cartao', 'instituicao', 'metodo'],
     ...transactions.map((tx) => [
       tx.date,
       tx.description,
       tx.category,
       tx.type,
       tx.amount.toFixed(2).replace('.', ','),
-      tx.recurring ? 'sim' : 'nao'
+      tx.recurring ? 'sim' : 'nao',
+      getAccountById(tx.financialAccountId)?.nickname || '',
+      getInstitutionById(getAccountById(tx.financialAccountId)?.institutionId)?.name || '',
+      getPaymentMethodById(tx.paymentMethodId)?.name || ''
     ])
   ];
 
@@ -2380,7 +2978,8 @@ function isValidBackupState(nextState) {
     && !Array.isArray(nextState)
     && Array.isArray(nextState.transactions)
     && Array.isArray(nextState.budgets)
-    && Array.isArray(nextState.subscriptions);
+    && Array.isArray(nextState.subscriptions)
+    && (nextState.financialAccounts === undefined || Array.isArray(nextState.financialAccounts));
 }
 
 function getSortedTransactions() {
@@ -2477,6 +3076,483 @@ function getAvailableCategories() {
   return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+function getFallbackPaymentMethods() {
+  return [
+    ['pm_pix', 'pix', 'Pix', 'qr-code', '#38bdf8'],
+    ['pm_credit_card', 'credit_card', 'Cartão de crédito', 'credit-card', '#a78bfa'],
+    ['pm_debit_card', 'debit_card', 'Cartão de débito', 'badge-dollar-sign', '#34d399'],
+    ['pm_cash', 'cash', 'Dinheiro', 'banknote', '#fbbf24'],
+    ['pm_boleto', 'boleto', 'Boleto', 'barcode', '#cbd5e1'],
+    ['pm_bank_transfer', 'bank_transfer', 'Transferência bancária', 'landmark', '#60a5fa'],
+    ['pm_ted_doc', 'ted_doc', 'TED/DOC', 'send', '#93c5fd'],
+    ['pm_auto_debit', 'auto_debit', 'Débito automático', 'repeat-2', '#2dd4bf'],
+    ['pm_digital_wallet', 'digital_wallet', 'Carteira digital', 'wallet-cards', '#fb7185'],
+    ['pm_other', 'other', 'Outro', 'circle-ellipsis', '#94a3b8']
+  ].map(([id, slug, name, iconName, color], index) => ({
+    id, slug, name, description: '', icon: iconName, color, isSystemDefault: true, isActive: true, sortOrder: (index + 1) * 10
+  }));
+}
+
+function getFallbackFinancialInstitutions() {
+  return [
+    ['fi_nubank', 'nubank', 'Nubank', 'Nubank', 'bank', '/assets/img/bank-logos/Nubank_logo_2021.svg.png', '#820ad1', '#f0e7ff'],
+    ['fi_banco_inter', 'banco-inter', 'Banco Inter', 'Inter', 'bank', '/assets/img/bank-logos/Logo-banco-inter.svg.png', '#ff7a00', '#fff1e5'],
+    ['fi_itau', 'itau', 'Itaú', 'Itaú', 'bank', '/assets/img/bank-logos/Itaú_Unibanco_logo_2023.svg.png', '#ec7000', '#1f4aa8'],
+    ['fi_santander', 'santander', 'Santander', 'Santander', 'bank', '/assets/img/bank-logos/Banco_Santander_Logotipo.svg.png', '#ec0000', '#ffffff'],
+    ['fi_bradesco', 'bradesco', 'Bradesco', 'Bradesco', 'bank', '/assets/img/bank-logos/Banco_Bradesco_logo.svg.png', '#cc092f', '#ffffff'],
+    ['fi_banco_do_brasil', 'banco-do-brasil', 'Banco do Brasil', 'BB', 'bank', '/assets/img/bank-logos/Banco_do_Brasil_logo.svg.png', '#f8d117', '#1e3a8a'],
+    ['fi_mercado_pago', 'mercado-pago', 'Mercado Pago', 'Mercado Pago', 'wallet', '/assets/img/bank-logos/Mercado_Pago.svg.webp', '#00b1ea', '#ffffff'],
+    ['fi_picpay', 'picpay', 'PicPay', 'PicPay', 'wallet', '/assets/img/bank-logos/picpay-1.svg', '#11c76f', '#ffffff'],
+    ['fi_c6_bank', 'c6-bank', 'C6 Bank', 'C6', 'bank', '/assets/img/bank-logos/Logo_C6_Bank.svg.png', '#111827', '#fbbf24'],
+    ['fi_cash', 'dinheiro-fisico', 'Dinheiro físico', 'Dinheiro', 'cash', '', '#fbbf24', '#111827'],
+    ['fi_other', 'outro', 'Outro', 'Outro', 'other', '', '#94a3b8', '#334155']
+  ].map(([id, slug, name, shortName, type, logoPath, brandColor, secondaryColor], index) => ({
+    id, slug, name, shortName, type, logoPath, icon: type === 'wallet' ? 'wallet-cards' : type === 'cash' ? 'banknote' : 'landmark',
+    brandColor, secondaryColor, website: '', isSystemDefault: true, isActive: true, sortOrder: (index + 1) * 10
+  }));
+}
+
+function getPaymentMethods() {
+  return (state.paymentMethods?.length ? state.paymentMethods : getFallbackPaymentMethods()).filter((method) => method.isActive !== false);
+}
+
+function getFinancialInstitutions() {
+  return (state.financialInstitutions?.length ? state.financialInstitutions : getFallbackFinancialInstitutions()).filter((institution) => institution.isActive !== false);
+}
+
+function getAccountById(id) {
+  return state.financialAccounts.find((account) => account.id === id) || null;
+}
+
+function getPaymentMethodById(id) {
+  return getPaymentMethods().find((method) => method.id === id) || null;
+}
+
+function getPaymentMethodBySlug(slug) {
+  return getPaymentMethods().find((method) => method.slug === slug) || null;
+}
+
+function getInstitutionById(id) {
+  return getFinancialInstitutions().find((institution) => institution.id === id) || null;
+}
+
+function getInstitutionBySlug(slug) {
+  return getFinancialInstitutions().find((institution) => institution.slug === slug) || null;
+}
+
+function getAccountTypeLabel(type) {
+  return accountTypeOptions.find(([value]) => value === type)?.[1] || 'Conta';
+}
+
+function renderInstitutionOptions(selectedId = '', includeEmpty = false) {
+  const options = getFinancialInstitutions().map((institution) => [institution.id, `${institution.shortName || institution.name} · ${getInstitutionTypeLabel(institution.type)}`]);
+  return selectOptions(includeEmpty ? [['', 'Sem instituição'], ...options] : options, selectedId);
+}
+
+function renderInstitutionFilterOptions(selectedId = 'all') {
+  return selectOptions([['all', 'Todos bancos'], ...getFinancialInstitutions().map((institution) => [institution.id, institution.shortName || institution.name])], selectedId);
+}
+
+function renderFinancialAccountOptions(selectedId = '', includeEmpty = false) {
+  const options = state.financialAccounts
+    .filter((account) => account.isActive !== false)
+    .map((account) => {
+      const institution = getInstitutionById(account.institutionId);
+      return [account.id, `${institution?.shortName ? `${institution.shortName} · ` : ''}${account.nickname || account.name}${account.lastFourDigits ? ` · final ${account.lastFourDigits}` : ''}`];
+    });
+  return selectOptions(includeEmpty ? [['', 'Sem conta/cartão'], ...options] : options, selectedId);
+}
+
+function renderFinancialAccountFilterOptions(selectedId = 'all') {
+  return selectOptions([['all', 'Todas contas'], ...state.financialAccounts.map((account) => [account.id, account.nickname || account.name])], selectedId);
+}
+
+function renderPaymentMethodOptions(selectedId = '', includeEmpty = false) {
+  const options = getPaymentMethods().map((method) => [method.id, method.name]);
+  return selectOptions(includeEmpty ? [['', 'Sem método'], ...options] : options, selectedId);
+}
+
+function renderPaymentMethodFilterOptions(selectedId = 'all') {
+  return selectOptions([['all', 'Todos métodos'], ...getPaymentMethods().map((method) => [method.id, method.name])], selectedId);
+}
+
+function institutionLogo(institution, className = 'h-9 w-9') {
+  if (!institution) {
+    return `<span class="institution-logo ${className}">${icon('landmark', 'h-4 w-4')}</span>`;
+  }
+  const initials = String(institution.shortName || institution.name || '?').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+  const style = institutionStyleVars(institution);
+  if (institution.logoPath) {
+    return `<span class="institution-logo ${className}" style="${style}"><img src="${escapeHtml(institution.logoPath)}" alt="${escapeHtml(institution.name)}" loading="lazy" onerror="this.remove();this.parentElement.dataset.fallback='${escapeHtml(initials)}';" /></span>`;
+  }
+  return `<span class="institution-logo ${className}" style="${style}" data-fallback="${escapeHtml(initials)}"></span>`;
+}
+
+function institutionAvatar(institution, className = 'h-9 w-9') {
+  return institutionLogo(institution, `${className} institution-avatar`);
+}
+
+function institutionBadge(institution, label = '') {
+  if (!institution && !label) return '';
+  return `
+    <span class="source-badge institution-badge" style="${institutionStyleVars(institution)}">
+      ${institutionAvatar(institution, 'h-5 w-5')}
+      <span>${escapeHtml(label || institution?.shortName || institution?.name || 'Instituição')}</span>
+    </span>
+  `;
+}
+
+function paymentMethodBadge(methodId) {
+  const method = getPaymentMethodById(methodId);
+  if (!method) return '';
+  return `<span class="source-badge payment-method-badge" style="--method-color:${escapeHtml(method.color || '#94a3b8')}">${paymentMethodIcon(method.id, 'h-3.5 w-3.5')} ${escapeHtml(shortPaymentMethodLabel(method))}</span>`;
+}
+
+function paymentMethodIcon(methodId, className = 'h-4 w-4') {
+  const method = getPaymentMethodById(methodId);
+  return icon(method?.icon || 'circle', className);
+}
+
+function financialAccountBadge(accountId, methodId) {
+  const account = getAccountById(accountId);
+  const method = getPaymentMethodById(methodId);
+  const institution = getInstitutionById(account?.institutionId);
+  if (!account && !method) return '<span class="text-xs text-slate-500">Sem origem</span>';
+  return `
+    <div class="flex max-w-[260px] flex-wrap items-center gap-1.5">
+      ${account ? accountOriginBadge(account, institution) : ''}
+      ${method ? paymentMethodBadge(method.id) : ''}
+    </div>
+  `;
+}
+
+function accountOriginBadge(account, institution = getInstitutionById(account?.institutionId)) {
+  if (!account) return '';
+  return `
+    <span class="source-badge account-origin-badge" style="${institutionStyleVars(institution, account.color)}">
+      ${institutionAvatar(institution, 'h-5 w-5')}
+      <span>${escapeHtml(account.nickname || account.name)}${account.lastFourDigits ? ` · ${escapeHtml(account.lastFourDigits)}` : ''}</span>
+    </span>
+  `;
+}
+
+function transactionOriginCell(tx, compact = false) {
+  const account = getAccountById(tx.financialAccountId);
+  const institution = getInstitutionById(account?.institutionId);
+  const method = getPaymentMethodById(tx.paymentMethodId);
+  if (!account && !method) return '<span class="text-xs text-slate-500">Sem origem</span>';
+  return `
+    <div class="origin-cell ${compact ? 'origin-cell-compact' : ''}" style="${institutionStyleVars(institution, account?.color)}">
+      <div class="origin-main">
+        ${account ? institutionAvatar(institution, 'h-8 w-8') : method ? `<span class="method-avatar" style="--method-color:${escapeHtml(method.color || '#94a3b8')}">${paymentMethodIcon(method.id, 'h-4 w-4')}</span>` : ''}
+        <div class="min-w-0">
+          <div class="truncate text-sm font-semibold text-slate-100">${escapeHtml(account?.nickname || account?.name || method?.name || 'Sem conta')}</div>
+          <div class="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-400">
+            ${method ? `<span>${paymentMethodIcon(method.id, 'h-3 w-3')} ${escapeHtml(shortPaymentMethodLabel(method))}</span>` : ''}
+            ${institution ? `<span>${escapeHtml(institution.shortName || institution.name)}</span>` : ''}
+            ${account?.lastFourDigits ? `<span>final ${escapeHtml(account.lastFourDigits)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function compactOriginPill(tx) {
+  const account = getAccountById(tx.financialAccountId);
+  const institution = getInstitutionById(account?.institutionId);
+  const method = getPaymentMethodById(tx.paymentMethodId);
+  if (!account && !method) return '';
+  return `
+    <span class="compact-origin-pill" style="${institutionStyleVars(institution, account?.color)}">
+      ${method ? paymentMethodIcon(method.id, 'h-3.5 w-3.5') : institutionAvatar(institution, 'h-4 w-4')}
+      ${escapeHtml([shortPaymentMethodLabel(method), institution?.shortName || account?.nickname].filter(Boolean).join(' · '))}
+    </span>
+  `;
+}
+
+function renderTransactionSourceMeta(tx) {
+  const account = getAccountById(tx.financialAccountId);
+  const institution = getInstitutionById(account?.institutionId);
+  const method = getPaymentMethodById(tx.paymentMethodId);
+  return [method?.name, account?.nickname || account?.name, institution?.shortName].filter(Boolean).map(escapeHtml).join(' • ');
+}
+
+function renderQuickPresetChip(preset) {
+  const institution = getInstitutionBySlug(preset.institutionSlug);
+  const selected = valueOf('selectedAccountPreset', '') === preset.label;
+  return `
+    <button class="preset-chip ${selected ? 'active' : ''}" type="button" data-preset-chip="${escapeHtml(preset.label)}" style="${institutionStyleVars(institution)}">
+      ${institutionAvatar(institution, 'h-7 w-7')}
+      <span class="truncate">${escapeHtml(preset.label)}</span>
+    </button>
+  `;
+}
+
+function institutionSelectPreview(institutionId) {
+  const institution = getInstitutionById(institutionId);
+  if (!institution) return '';
+  return `
+    <div class="select-visual-preview" style="${institutionStyleVars(institution)}">
+      ${institutionAvatar(institution, 'h-9 w-9')}
+      <div class="min-w-0">
+        <p class="truncate text-sm font-semibold text-slate-100">${escapeHtml(institution.name)}</p>
+        <p class="truncate text-xs text-slate-500">${escapeHtml(getInstitutionTypeLabel(institution.type))}</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderCreditCardPreview(account, options = {}) {
+  const institution = getInstitutionById(account.institutionId);
+  const stats = options.stats || getAccountStats(account);
+  const isCredit = account.type === 'credit_card';
+  const canDelete = options.canDelete !== false;
+  const available = options.available ?? (isCredit && account.creditLimit ? Math.max(0, account.creditLimit - stats.monthExpense) : null);
+  const interactive = options.interactive === true;
+  const cardLabel = isCredit ? 'Crédito' : account.type === 'debit_card' ? 'Débito' : getAccountTypeLabel(account.type);
+  return `
+    <article class="credit-card-preview ${account.isActive === false ? 'archived' : ''}" style="${institutionStyleVars(institution, account.color)}">
+      <div class="credit-card-top">
+        ${institutionLogo(institution, 'h-10 w-10')}
+        <span class="credit-card-status">${account.isActive === false ? 'Arquivada' : 'Ativa'}</span>
+      </div>
+      <div class="mt-7">
+        <p class="text-xs uppercase text-slate-400">${escapeHtml(cardLabel)}</p>
+        <h3 class="mt-1 truncate text-xl font-semibold text-slate-50">${escapeHtml(account.nickname || account.name || 'Cartão')}</h3>
+        <p class="mt-2 text-sm text-slate-400">${account.lastFourDigits ? `•••• ${escapeHtml(account.lastFourDigits)}` : 'final não informado'}${account.cardBrand ? ` · ${escapeHtml(account.cardBrand)}` : ''}</p>
+      </div>
+      <div class="credit-card-metrics">
+        <span><small>${isCredit ? 'Gasto' : 'Movimento'}</small><strong>${currency.format(stats.monthExpense || stats.monthVolume || 0)}</strong></span>
+        <span><small>${isCredit ? 'Disponível' : 'Saldo'}</small><strong>${currency.format(isCredit ? (available || 0) : stats.balance)}</strong></span>
+      </div>
+      <div class="credit-card-footer">
+        <span>${account.closingDay ? `Fecha ${account.closingDay}` : 'Sem fechamento'}</span>
+        <span>${account.dueDay ? `Vence ${account.dueDay}` : 'Sem vencimento'}</span>
+      </div>
+      ${interactive ? `
+        <div class="credit-card-actions">
+          <button class="icon-ghost h-9 w-9 p-0" data-edit-account="${account.id}" aria-label="Editar ${escapeHtml(account.nickname || account.name)}">${icon('pencil', 'h-4 w-4')}</button>
+          ${account.isActive ? `<button class="icon-ghost h-9 w-9 p-0" data-archive-account="${account.id}" aria-label="Arquivar ${escapeHtml(account.nickname || account.name)}">${icon('archive', 'h-4 w-4')}</button>` : `<button class="icon-ghost h-9 w-9 p-0" data-restore-account="${account.id}" aria-label="Ativar ${escapeHtml(account.nickname || account.name)}">${icon('rotate-ccw', 'h-4 w-4')}</button>`}
+          ${canDelete ? `<button class="btn-danger h-9 w-9 p-0" data-delete-account="${account.id}" aria-label="Excluir ${escapeHtml(account.nickname || account.name)}">${icon('trash-2', 'h-4 w-4')}</button>` : ''}
+        </div>
+      ` : ''}
+    </article>
+  `;
+}
+
+function calendarTransactionPill(item, dense = false) {
+  const account = getAccountById(item.financialAccountId);
+  const institution = getInstitutionById(account?.institutionId);
+  const method = getPaymentMethodById(item.paymentMethodId);
+  const label = [shortPaymentMethodLabel(method), institution?.shortName || account?.nickname || item.category || item.typeLabel].filter(Boolean).join(' · ');
+  return `
+    <div class="calendar-transaction-pill ${dense ? 'dense' : ''} ${scheduleToneClass(item.tone)}" style="${institutionStyleVars(institution, account?.color)}" title="${escapeHtml([item.title, label, currency.format(item.amount)].filter(Boolean).join(' · '))}">
+      <div class="min-w-0">
+        <div class="truncate font-medium text-slate-100">${escapeHtml(item.title)}</div>
+        <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+          ${method ? paymentMethodIcon(method.id, 'h-3 w-3') : ''}
+          <span class="truncate">${escapeHtml(label || 'Agenda')}</span>
+        </div>
+      </div>
+      <span class="shrink-0">${currency.format(item.amount)}</span>
+    </div>
+  `;
+}
+
+function renderReportEntity(row, title) {
+  const institution = getFinancialInstitutions().find((item) => item.name === row.label || item.shortName === row.label);
+  const method = getPaymentMethods().find((item) => item.name === row.label || shortPaymentMethodLabel(item) === row.label);
+  const account = state.financialAccounts.find((item) => (item.nickname || item.name) === row.label);
+  if (account) return accountOriginBadge(account);
+  if (institution) return institutionBadge(institution);
+  if (method) return paymentMethodBadge(method.id);
+  if (normalizeText(title).includes('cartao')) return `<span class="source-badge">${icon(domainIcons.credit, 'h-3.5 w-3.5')} ${escapeHtml(row.label)}</span>`;
+  return `<span class="source-badge">${escapeHtml(row.label)}</span>`;
+}
+
+function shortPaymentMethodLabel(method) {
+  if (!method) return '';
+  const normalized = normalizeText(method.name);
+  if (normalized.includes('credito')) return 'Crédito';
+  if (normalized.includes('debito') && !normalized.includes('automatico')) return 'Débito';
+  if (normalized.includes('transferencia')) return 'Transferência';
+  if (normalized.includes('carteira')) return 'Carteira';
+  return method.name;
+}
+
+function getInstitutionTypeLabel(type) {
+  if (type === 'wallet') return 'Carteira digital';
+  if (type === 'investment') return 'Investimentos';
+  if (type === 'cash') return 'Dinheiro físico';
+  if (type === 'other') return 'Outro';
+  return 'Banco';
+}
+
+function institutionStyleVars(institution, overrideColor = '') {
+  const color = overrideColor || institution?.brandColor || '#8b7cf6';
+  const secondary = institution?.secondaryColor || '#0f172a';
+  return `--brand:${escapeHtml(color)};--brand-secondary:${escapeHtml(secondary)};--account-color:${escapeHtml(color)}`;
+}
+
+function buildAccountDraftFromPreset(preset) {
+  const institution = preset ? getInstitutionBySlug(preset.institutionSlug) : null;
+  return {
+    id: '',
+    institutionId: institution?.id || '',
+    name: preset?.label || '',
+    nickname: preset?.label || '',
+    type: preset?.type || 'checking_account',
+    lastFourDigits: '',
+    cardBrand: '',
+    color: institution?.brandColor || '#8b7cf6',
+    initialBalance: 0,
+    manualBalance: null,
+    creditLimit: null,
+    closingDay: null,
+    dueDay: null,
+    includeInTotalBalance: preset?.type !== 'credit_card',
+    isDefault: false,
+    isActive: true,
+    notes: '',
+    paymentMethodIds: preset ? preset.methods.map((slug) => getPaymentMethodBySlug(slug)?.id).filter(Boolean) : getDefaultPaymentMethodsForType('checking_account')
+  };
+}
+
+function getDefaultPaymentMethodsForType(type) {
+  const slugsByType = {
+    checking_account: ['pix', 'debit_card', 'bank_transfer', 'boleto', 'auto_debit'],
+    savings_account: ['pix', 'bank_transfer'],
+    credit_card: ['credit_card'],
+    debit_card: ['debit_card'],
+    cash: ['cash'],
+    digital_wallet: ['pix', 'digital_wallet', 'debit_card', 'credit_card'],
+    investment_account: ['bank_transfer', 'ted_doc'],
+    prepaid_card: ['debit_card', 'credit_card'],
+    benefits_card: ['debit_card'],
+    other: ['other']
+  };
+  return (slugsByType[type] || ['other']).map((slug) => getPaymentMethodBySlug(slug)?.id).filter(Boolean);
+}
+
+function getSuggestedPaymentMethodId(account) {
+  if (!account) return '';
+  const preferredByType = {
+    credit_card: 'credit_card',
+    debit_card: 'debit_card',
+    cash: 'cash',
+    digital_wallet: 'pix',
+    checking_account: 'pix',
+    savings_account: 'pix',
+    investment_account: 'bank_transfer'
+  };
+  const preferred = getPaymentMethodBySlug(preferredByType[account.type] || 'other')?.id;
+  return account.paymentMethodIds?.includes(preferred) ? preferred : (account.paymentMethodIds?.[0] || preferred || '');
+}
+
+function filterFinancialAccounts(filters) {
+  return [...state.financialAccounts].filter((account) => {
+    const institution = getInstitutionById(account.institutionId);
+    if (filters.status === 'active' && account.isActive === false) return false;
+    if (filters.status === 'archived' && account.isActive !== false) return false;
+    if (filters.type !== 'all' && account.type !== filters.type) return false;
+    if (filters.institutionId !== 'all' && account.institutionId !== filters.institutionId) return false;
+    if (filters.paymentMethodId !== 'all' && !account.paymentMethodIds?.includes(filters.paymentMethodId)) return false;
+    if (filters.search && !`${account.name} ${account.nickname} ${institution?.name || ''}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    return true;
+  });
+}
+
+function getAccountStats(account) {
+  const monthKey = currentPeriodKey();
+  const transactions = state.transactions.filter((tx) => tx.financialAccountId === account.id);
+  const monthTransactions = transactions.filter((tx) => tx.date.slice(0, 7) === monthKey);
+  const income = transactions.filter((tx) => tx.type === 'income').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const expense = transactions.filter((tx) => tx.type === 'expense').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const investment = transactions.filter((tx) => tx.type === 'investment').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const monthExpense = monthTransactions.filter((tx) => tx.type === 'expense').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const monthVolume = monthTransactions.reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const calculatedBalance = finance.subtractMoney(finance.addMoney(account.initialBalance || 0, income), expense, investment);
+  return {
+    balance: account.manualBalance !== null && account.manualBalance !== undefined ? account.manualBalance : calculatedBalance,
+    monthExpense,
+    monthVolume
+  };
+}
+
+function getPaymentSourceSummary() {
+  const monthKey = currentPeriodKey();
+  const activeAccounts = state.financialAccounts.filter((account) => account.isActive !== false);
+  const includedBalance = activeAccounts
+    .filter((account) => account.includeInTotalBalance !== false && account.type !== 'credit_card')
+    .reduce((sum, account) => finance.addMoney(sum, getAccountStats(account).balance), 0);
+  const monthTransactions = state.transactions.filter((tx) => tx.date.slice(0, 7) === monthKey);
+  const creditCardSpending = monthTransactions
+    .filter((tx) => tx.type === 'expense' && getAccountById(tx.financialAccountId)?.type === 'credit_card')
+    .reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+
+  return {
+    activeAccounts: activeAccounts.length,
+    includedBalance,
+    creditCardSpending,
+    topMethod: topAmount(groupByLabel(monthTransactions, (tx) => getPaymentMethodById(tx.paymentMethodId)?.name)),
+    topInstitution: topAmount(groupByLabel(monthTransactions, (tx) => getInstitutionById(getAccountById(tx.financialAccountId)?.institutionId)?.name)),
+    methods: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'expense'), (tx) => getPaymentMethodById(tx.paymentMethodId)?.name)),
+    institutions: sortedAmounts(groupByLabel(monthTransactions, (tx) => getInstitutionById(getAccountById(tx.financialAccountId)?.institutionId)?.name)),
+    creditCards: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'expense' && getAccountById(tx.financialAccountId)?.type === 'credit_card'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name)),
+    accounts: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'expense'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name)),
+    incomeAccounts: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'income'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name)),
+    investmentAccounts: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'investment'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name))
+  };
+}
+
+function getTopAccountForDashboard() {
+  const monthKey = currentPeriodKey();
+  const rows = sortedAmounts(groupByLabel(
+    state.transactions.filter((tx) => tx.date.slice(0, 7) === monthKey && tx.financialAccountId),
+    (tx) => tx.financialAccountId
+  ));
+  const account = getAccountById(rows[0]?.label);
+  return account ? { account, institution: getInstitutionById(account.institutionId) } : null;
+}
+
+function getTopCreditCardForDashboard() {
+  const monthKey = currentPeriodKey();
+  const rows = sortedAmounts(groupByLabel(
+    state.transactions.filter((tx) => tx.date.slice(0, 7) === monthKey && getAccountById(tx.financialAccountId)?.type === 'credit_card'),
+    (tx) => tx.financialAccountId
+  ));
+  const account = getAccountById(rows[0]?.label);
+  return account ? { account, institution: getInstitutionById(account.institutionId) } : null;
+}
+
+function groupByLabel(transactions, getLabel) {
+  return transactions.reduce((map, tx) => {
+    const label = getLabel(tx) || 'Sem classificação';
+    map[label] = finance.addMoney(map[label] || 0, tx.amount);
+    return map;
+  }, {});
+}
+
+function sortedAmounts(map) {
+  return Object.entries(map).map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
+}
+
+function topAmount(map) {
+  return sortedAmounts(map)[0] || null;
+}
+
+function formatMoneyInput(value) {
+  return Number(value || 0).toFixed(2).replace('.', ',');
+}
+
+function normalizeDayInput(value) {
+  if (!String(value || '').trim()) return null;
+  const day = Number(value);
+  if (!Number.isFinite(day)) return null;
+  return Math.max(1, Math.min(31, Math.trunc(day)));
+}
+
 function persistViewValue(key, value) {
   ui.viewState[key] = value;
 }
@@ -2488,10 +3564,15 @@ function valueOf(key, fallback) {
 
 function filterTransactions(filters) {
   return getSortedTransactions().filter((tx) => {
+    const account = getAccountById(tx.financialAccountId);
     if (filters.type !== 'all' && tx.type !== filters.type) return false;
     if (filters.recurring === 'recurring' && !tx.recurring) return false;
     if (filters.recurring === 'single' && tx.recurring) return false;
-    if (filters.search && !`${tx.description} ${tx.category}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.financialAccountId && filters.financialAccountId !== 'all' && tx.financialAccountId !== filters.financialAccountId) return false;
+    if (filters.institutionId && filters.institutionId !== 'all' && account?.institutionId !== filters.institutionId) return false;
+    if (filters.paymentMethodId && filters.paymentMethodId !== 'all' && tx.paymentMethodId !== filters.paymentMethodId) return false;
+    if (filters.cardBrand && filters.cardBrand !== 'all' && account?.cardBrand !== filters.cardBrand) return false;
+    if (filters.search && !`${tx.description} ${tx.category} ${account?.nickname || ''} ${getInstitutionById(account?.institutionId)?.name || ''} ${getPaymentMethodById(tx.paymentMethodId)?.name || ''}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
     if (filters.month && tx.date.slice(0, 7) !== filters.month) return false;
     return true;
   });
@@ -2617,6 +3698,8 @@ function getCalendarItemsForDate(date) {
     if (!occursOnDate) return;
 
     items.push({
+      financialAccountId: tx.financialAccountId || '',
+      paymentMethodId: tx.paymentMethodId || '',
       title: tx.description,
       amount: tx.amount,
       category: tx.category,
@@ -2634,6 +3717,8 @@ function getCalendarItemsForDate(date) {
     .forEach((subscription) => {
       const status = finance.getSubscriptionStatus(subscription, periodMonth, localISO(new Date()));
       items.push({
+        financialAccountId: subscription.financialAccountId || '',
+        paymentMethodId: subscription.paymentMethodId || '',
         title: subscription.name,
         amount: subscription.amount,
         category: subscription.category,
@@ -2866,24 +3951,30 @@ function renderDashboardChart() {
         {
           label: 'Receitas',
           data: datasets.income,
-          borderColor: 'rgba(16, 185, 129, 1)',
-          backgroundColor: 'rgba(16, 185, 129, 0.16)',
+          borderColor: designColors.success,
+          backgroundColor: designColors.successSoft,
+          pointBackgroundColor: designColors.success,
+          pointBorderColor: designColors.success,
           fill: true,
           tension: 0.35
         },
         {
           label: 'Despesas',
           data: datasets.expense,
-          borderColor: 'rgba(251, 113, 133, 1)',
-          backgroundColor: 'rgba(251, 113, 133, 0.12)',
+          borderColor: designColors.danger,
+          backgroundColor: designColors.dangerSoft,
+          pointBackgroundColor: designColors.danger,
+          pointBorderColor: designColors.danger,
           fill: true,
           tension: 0.35
         },
         {
           label: 'Investimentos',
           data: datasets.investment,
-          borderColor: 'rgba(139, 92, 246, 1)',
-          backgroundColor: 'rgba(139, 92, 246, 0.12)',
+          borderColor: designColors.accent,
+          backgroundColor: designColors.accentSoft,
+          pointBackgroundColor: designColors.accent,
+          pointBorderColor: designColors.accent,
           fill: true,
           tension: 0.35
         }
@@ -2910,14 +4001,16 @@ function renderReportCharts() {
       datasets: [{
         data: values.length ? values : [1],
         backgroundColor: [
-          'rgba(16,185,129,.85)',
-          'rgba(251,113,133,.85)',
-          'rgba(139,92,246,.85)',
-          'rgba(56,189,248,.85)',
-          'rgba(251,191,36,.85)',
-          'rgba(244,114,182,.85)'
+          'rgba(52,211,153,.78)',
+          'rgba(251,113,133,.78)',
+          'rgba(139,124,246,.78)',
+          'rgba(56,189,248,.76)',
+          'rgba(251,191,36,.74)',
+          'rgba(244,114,182,.72)'
         ],
-        borderWidth: 0
+        borderColor: '#0b1220',
+        borderWidth: 3,
+        hoverOffset: 3
       }]
     },
     options: doughnutChartOptions(values)
@@ -2937,8 +4030,10 @@ function renderReportCharts() {
       datasets: [{
         label: 'Saldo mensal',
         data: balances,
-        backgroundColor: balances.map((value) => value >= 0 ? 'rgba(16,185,129,.78)' : 'rgba(251,113,133,.78)'),
-        borderRadius: 12
+        backgroundColor: balances.map((value) => value >= 0 ? 'rgba(52,211,153,.70)' : 'rgba(251,113,133,.70)'),
+        borderColor: balances.map((value) => value >= 0 ? 'rgba(52,211,153,.95)' : 'rgba(251,113,133,.95)'),
+        borderWidth: 1,
+        borderRadius: 8
       }]
     },
     options: chartBaseOptions()
@@ -2953,26 +4048,50 @@ function chartBaseOptions() {
     plugins: {
       legend: {
         labels: {
-          color: '#cbd5e1'
+          color: designColors.textSecondary,
+          boxWidth: 10,
+          boxHeight: 10,
+          usePointStyle: true,
+          padding: 18
         }
       },
       tooltip: {
+        backgroundColor: 'rgba(8, 13, 24, 0.96)',
+        borderColor: designColors.border,
+        borderWidth: 1,
+        titleColor: designColors.textPrimary,
+        bodyColor: designColors.textSecondary,
+        padding: 12,
+        displayColors: true,
         callbacks: {
           label: (context) => `${context.dataset.label || context.label}: ${currency.format(context.parsed.y ?? context.parsed)}`
         }
       }
     },
+    interaction: {
+      intersect: false,
+      mode: 'index'
+    },
+    elements: {
+      line: {
+        borderWidth: 2
+      },
+      point: {
+        radius: 2.5,
+        hoverRadius: 4
+      }
+    },
     scales: {
       x: {
-        ticks: { color: '#94a3b8' },
-        grid: { color: 'rgba(255,255,255,0.05)' }
+        ticks: { color: designColors.textMuted },
+        grid: { color: designColors.grid, drawBorder: false }
       },
       y: {
         ticks: {
-          color: '#94a3b8',
+          color: designColors.textMuted,
           callback: (value) => currency.format(value)
         },
-        grid: { color: 'rgba(255,255,255,0.05)' }
+        grid: { color: designColors.grid, drawBorder: false }
       }
     }
   };
@@ -2983,17 +4102,25 @@ function doughnutChartOptions(values) {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    cutout: '68%',
+    cutout: '70%',
     plugins: {
       legend: {
         position: 'bottom',
         labels: {
-          color: '#cbd5e1',
+          color: designColors.textSecondary,
           usePointStyle: true,
+          boxWidth: 9,
+          boxHeight: 9,
           padding: 18
         }
       },
       tooltip: {
+        backgroundColor: 'rgba(8, 13, 24, 0.96)',
+        borderColor: designColors.border,
+        borderWidth: 1,
+        titleColor: designColors.textPrimary,
+        bodyColor: designColors.textSecondary,
+        padding: 12,
         callbacks: {
           label: (context) => {
             const value = Number(context.parsed || 0);

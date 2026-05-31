@@ -15,6 +15,40 @@ const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const NORMALIZED_DATABASE_URL = normalizeDatabaseUrl(DATABASE_URL);
 const HAS_DATABASE = Boolean(NORMALIZED_DATABASE_URL);
 
+const PAYMENT_METHOD_SEEDS = [
+  ['pm_pix', 'pix', 'Pix', 'Pagamento instantâneo via chave, QR Code ou copia e cola.', 'qr-code', '#38bdf8', true, true, 10],
+  ['pm_credit_card', 'credit_card', 'Cartão de crédito', 'Compra lançada em fatura de cartão de crédito.', 'credit-card', '#a78bfa', true, true, 20],
+  ['pm_debit_card', 'debit_card', 'Cartão de débito', 'Compra debitada diretamente da conta.', 'badge-dollar-sign', '#34d399', true, true, 30],
+  ['pm_cash', 'cash', 'Dinheiro', 'Pagamento em espécie.', 'banknote', '#fbbf24', true, true, 40],
+  ['pm_boleto', 'boleto', 'Boleto', 'Pagamento por boleto bancário.', 'barcode', '#cbd5e1', true, true, 50],
+  ['pm_bank_transfer', 'bank_transfer', 'Transferência bancária', 'Transferência entre contas.', 'landmark', '#60a5fa', true, true, 60],
+  ['pm_ted_doc', 'ted_doc', 'TED/DOC', 'Transferência bancária tradicional.', 'send', '#93c5fd', true, true, 70],
+  ['pm_auto_debit', 'auto_debit', 'Débito automático', 'Cobrança automática em conta.', 'repeat-2', '#2dd4bf', true, true, 80],
+  ['pm_digital_wallet', 'digital_wallet', 'Carteira digital', 'Pagamento via carteira digital.', 'wallet-cards', '#fb7185', true, true, 90],
+  ['pm_other', 'other', 'Outro', 'Método de pagamento não classificado.', 'circle-ellipsis', '#94a3b8', true, true, 100]
+];
+
+const FINANCIAL_INSTITUTION_SEEDS = [
+  ['fi_nubank', 'nubank', 'Nubank', 'Nubank', 'bank', '/assets/img/bank-logos/Nubank_logo_2021.svg.png', 'landmark', '#820ad1', '#f0e7ff', 'https://nubank.com.br', true, true, 10],
+  ['fi_banco_inter', 'banco-inter', 'Banco Inter', 'Inter', 'bank', '/assets/img/bank-logos/Logo-banco-inter.svg.png', 'landmark', '#ff7a00', '#fff1e5', 'https://www.bancointer.com.br', true, true, 20],
+  ['fi_itau', 'itau', 'Itaú', 'Itaú', 'bank', '/assets/img/bank-logos/Itaú_Unibanco_logo_2023.svg.png', 'landmark', '#ec7000', '#1f4aa8', 'https://www.itau.com.br', true, true, 30],
+  ['fi_santander', 'santander', 'Santander', 'Santander', 'bank', '/assets/img/bank-logos/Banco_Santander_Logotipo.svg.png', 'landmark', '#ec0000', '#ffffff', 'https://www.santander.com.br', true, true, 40],
+  ['fi_bradesco', 'bradesco', 'Bradesco', 'Bradesco', 'bank', '/assets/img/bank-logos/Banco_Bradesco_logo.svg.png', 'landmark', '#cc092f', '#ffffff', 'https://banco.bradesco', true, true, 50],
+  ['fi_banco_do_brasil', 'banco-do-brasil', 'Banco do Brasil', 'BB', 'bank', '/assets/img/bank-logos/Banco_do_Brasil_logo.svg.png', 'landmark', '#f8d117', '#1e3a8a', 'https://www.bb.com.br', true, true, 60],
+  ['fi_caixa', 'caixa', 'Caixa', 'Caixa', 'bank', null, 'landmark', '#0066b3', '#f39200', 'https://www.caixa.gov.br', true, true, 70],
+  ['fi_mercado_pago', 'mercado-pago', 'Mercado Pago', 'Mercado Pago', 'wallet', '/assets/img/bank-logos/Mercado_Pago.svg.webp', 'wallet-cards', '#00b1ea', '#ffffff', 'https://www.mercadopago.com.br', true, true, 80],
+  ['fi_picpay', 'picpay', 'PicPay', 'PicPay', 'wallet', '/assets/img/bank-logos/picpay-1.svg', 'wallet-cards', '#11c76f', '#ffffff', 'https://picpay.com', true, true, 90],
+  ['fi_c6_bank', 'c6-bank', 'C6 Bank', 'C6', 'bank', '/assets/img/bank-logos/Logo_C6_Bank.svg.png', 'landmark', '#111827', '#fbbf24', 'https://www.c6bank.com.br', true, true, 100],
+  ['fi_btg_pactual', 'btg-pactual', 'BTG Pactual', 'BTG', 'investment', null, 'chart-no-axes-combined', '#123c69', '#dbeafe', 'https://www.btgpactual.com', true, true, 110],
+  ['fi_xp', 'xp-investimentos', 'XP Investimentos', 'XP', 'investment', null, 'chart-candlestick', '#111827', '#f59e0b', 'https://www.xpi.com.br', true, true, 120],
+  ['fi_neon', 'neon', 'Neon', 'Neon', 'bank', null, 'landmark', '#00a5ff', '#f8fafc', 'https://neon.com.br', true, true, 130],
+  ['fi_next', 'next', 'Next', 'Next', 'bank', null, 'landmark', '#00ff5f', '#0f172a', 'https://next.me', true, true, 140],
+  ['fi_pagbank', 'pagbank', 'PagBank', 'PagBank', 'wallet', null, 'wallet-cards', '#fbbf24', '#111827', 'https://pagbank.com.br', true, true, 150],
+  ['fi_stone', 'stone', 'Stone', 'Stone', 'wallet', null, 'wallet-cards', '#00a868', '#ffffff', 'https://www.stone.com.br', true, true, 160],
+  ['fi_cash', 'dinheiro-fisico', 'Dinheiro físico', 'Dinheiro', 'cash', null, 'banknote', '#fbbf24', '#111827', null, true, true, 170],
+  ['fi_other', 'outro', 'Outro', 'Outro', 'other', null, 'circle-ellipsis', '#94a3b8', '#334155', null, true, true, 999]
+];
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -230,6 +264,83 @@ async function initializeSchema() {
       CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'investment'))
     );
 
+    CREATE TABLE IF NOT EXISTS payment_methods (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      description TEXT,
+      icon TEXT,
+      color TEXT,
+      is_system_default BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS financial_institutions (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      short_name TEXT,
+      type TEXT NOT NULL DEFAULT 'bank',
+      logo_path TEXT,
+      icon TEXT,
+      brand_color TEXT,
+      secondary_color TEXT,
+      website TEXT,
+      is_system_default BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS financial_accounts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      institution_id TEXT REFERENCES financial_institutions(id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
+      nickname TEXT,
+      type TEXT NOT NULL,
+      subtype TEXT,
+      last_four_digits TEXT,
+      card_brand TEXT,
+      color TEXT,
+      icon TEXT,
+      initial_balance NUMERIC NOT NULL DEFAULT 0,
+      manual_balance NUMERIC,
+      credit_limit NUMERIC,
+      closing_day INTEGER,
+      due_day INTEGER,
+      include_in_total_balance BOOLEAN NOT NULL DEFAULT TRUE,
+      is_default BOOLEAN NOT NULL DEFAULT FALSE,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      archived_at TIMESTAMPTZ,
+      notes TEXT,
+      external_provider TEXT,
+      external_account_id TEXT,
+      external_item_id TEXT,
+      last_sync_at TIMESTAMPTZ,
+      sync_status TEXT,
+      consent_expires_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT financial_accounts_type_check CHECK (type IN ('checking_account', 'savings_account', 'credit_card', 'debit_card', 'cash', 'digital_wallet', 'investment_account', 'prepaid_card', 'benefits_card', 'other')),
+      CONSTRAINT financial_accounts_last_four_digits_check CHECK (last_four_digits IS NULL OR last_four_digits ~ '^[0-9]{1,4}$'),
+      CONSTRAINT financial_accounts_closing_day_check CHECK (closing_day IS NULL OR closing_day BETWEEN 1 AND 31),
+      CONSTRAINT financial_accounts_due_day_check CHECK (due_day IS NULL OR due_day BETWEEN 1 AND 31)
+    );
+
+    CREATE TABLE IF NOT EXISTS financial_account_payment_methods (
+      id TEXT PRIMARY KEY,
+      financial_account_id TEXT NOT NULL REFERENCES financial_accounts(id) ON DELETE CASCADE,
+      payment_method_id TEXT NOT NULL REFERENCES payment_methods(id) ON DELETE RESTRICT,
+      is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (financial_account_id, payment_method_id)
+    );
+
     CREATE TABLE IF NOT EXISTS budgets (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -268,6 +379,10 @@ async function initializeSchema() {
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id_date ON transactions(user_id, date DESC, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id_type_date ON transactions(user_id, type, date DESC);
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id_category_date ON transactions(user_id, category, date DESC);
+    CREATE INDEX IF NOT EXISTS idx_financial_accounts_user_id ON financial_accounts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_financial_accounts_institution_id ON financial_accounts(institution_id);
+    CREATE INDEX IF NOT EXISTS idx_financial_accounts_type ON financial_accounts(type);
+    CREATE INDEX IF NOT EXISTS idx_financial_accounts_is_active ON financial_accounts(is_active);
     CREATE INDEX IF NOT EXISTS idx_budgets_user_id_created_at ON budgets(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id_created_at ON subscriptions(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_subscription_payments_user_id_period ON subscription_payments(user_id, period_month DESC);
@@ -275,6 +390,68 @@ async function initializeSchema() {
 
   await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT');
   await pool.query('ALTER TABLE goals ADD COLUMN IF NOT EXISTS current_amount NUMERIC NOT NULL DEFAULT 0');
+  await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_method_id TEXT');
+  await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS financial_account_id TEXT');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_financial_account_id ON transactions(financial_account_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_payment_method_id ON transactions(payment_method_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_user_id_financial_account_id ON transactions(user_id, financial_account_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_user_id_payment_method_id ON transactions(user_id, payment_method_id)');
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'transactions_payment_method_id_fkey') THEN
+        ALTER TABLE transactions
+          ADD CONSTRAINT transactions_payment_method_id_fkey
+          FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id) ON DELETE RESTRICT;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'transactions_financial_account_id_fkey') THEN
+        ALTER TABLE transactions
+          ADD CONSTRAINT transactions_financial_account_id_fkey
+          FOREIGN KEY (financial_account_id) REFERENCES financial_accounts(id) ON DELETE RESTRICT;
+      END IF;
+    END $$;
+  `);
+  await seedSystemPresets();
+}
+
+async function seedSystemPresets() {
+  for (const method of PAYMENT_METHOD_SEEDS) {
+    await pool.query(
+      `INSERT INTO payment_methods (id, slug, name, description, icon, color, is_system_default, is_active, sort_order, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+       ON CONFLICT (slug) DO UPDATE SET
+         name = EXCLUDED.name,
+         description = EXCLUDED.description,
+         icon = EXCLUDED.icon,
+         color = EXCLUDED.color,
+         is_system_default = EXCLUDED.is_system_default,
+         is_active = EXCLUDED.is_active,
+         sort_order = EXCLUDED.sort_order,
+         updated_at = NOW()`,
+      method
+    );
+  }
+
+  for (const institution of FINANCIAL_INSTITUTION_SEEDS) {
+    await pool.query(
+      `INSERT INTO financial_institutions (id, slug, name, short_name, type, logo_path, icon, brand_color, secondary_color, website, is_system_default, is_active, sort_order, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+       ON CONFLICT (slug) DO UPDATE SET
+         name = EXCLUDED.name,
+         short_name = EXCLUDED.short_name,
+         type = EXCLUDED.type,
+         logo_path = EXCLUDED.logo_path,
+         icon = EXCLUDED.icon,
+         brand_color = EXCLUDED.brand_color,
+         secondary_color = EXCLUDED.secondary_color,
+         website = EXCLUDED.website,
+         is_system_default = EXCLUDED.is_system_default,
+         is_active = EXCLUDED.is_active,
+         sort_order = EXCLUDED.sort_order,
+         updated_at = NOW()`,
+      institution
+    );
+  }
 }
 
 async function withTransaction(callback) {
@@ -379,12 +556,41 @@ async function findUserByToken(token, client = pool) {
 async function buildState(userId, client = pool) {
   await ensureDatabase();
 
-  const [userResult, goalResult, calculatorResult, transactionsResult, budgetsResult, subscriptionsResult, subscriptionPaymentsResult] = await Promise.all([
+  const [userResult, goalResult, calculatorResult, paymentMethodsResult, financialInstitutionsResult, financialAccountsResult, financialAccountMethodsResult, transactionsResult, budgetsResult, subscriptionsResult, subscriptionPaymentsResult] = await Promise.all([
     client.query('SELECT id, name, email FROM users WHERE id = $1 LIMIT 1', [userId]),
     client.query('SELECT name, target, current_amount FROM goals WHERE user_id = $1 LIMIT 1', [userId]),
     client.query('SELECT initial_amount, monthly_contribution, annual_rate, years FROM calculator_settings WHERE user_id = $1 LIMIT 1', [userId]),
     client.query(
-      `SELECT id, description, amount, type, category, date, recurring
+      `SELECT id, slug, name, description, icon, color, is_system_default, is_active, sort_order
+       FROM payment_methods
+       WHERE is_active = TRUE
+       ORDER BY sort_order, name`
+    ),
+    client.query(
+      `SELECT id, slug, name, short_name, type, logo_path, icon, brand_color, secondary_color, website, is_system_default, is_active, sort_order
+       FROM financial_institutions
+       WHERE is_active = TRUE
+       ORDER BY sort_order, name`
+    ),
+    client.query(
+      `SELECT id, user_id, institution_id, name, nickname, type, subtype, last_four_digits, card_brand, color, icon,
+              initial_balance, manual_balance, credit_limit, closing_day, due_day, include_in_total_balance,
+              is_default, is_active, archived_at, notes, external_provider, external_account_id, external_item_id,
+              last_sync_at, sync_status, consent_expires_at
+       FROM financial_accounts
+       WHERE user_id = $1
+       ORDER BY is_active DESC, is_default DESC, created_at DESC`,
+      [userId]
+    ),
+    client.query(
+      `SELECT fam.financial_account_id, fam.payment_method_id
+       FROM financial_account_payment_methods fam
+       INNER JOIN financial_accounts fa ON fa.id = fam.financial_account_id
+       WHERE fa.user_id = $1 AND fam.is_enabled = TRUE`,
+      [userId]
+    ),
+    client.query(
+      `SELECT id, description, amount, type, category, date, recurring, payment_method_id, financial_account_id
        FROM transactions
        WHERE user_id = $1
        ORDER BY date DESC, created_at DESC`,
@@ -433,6 +639,63 @@ async function buildState(userId, client = pool) {
       annualRate: Number(calculator?.annual_rate || 0),
       years: Number(calculator?.years || 0)
     },
+    paymentMethods: paymentMethodsResult.rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description || '',
+      icon: row.icon || 'circle',
+      color: row.color || '#94a3b8',
+      isSystemDefault: Boolean(row.is_system_default),
+      isActive: Boolean(row.is_active),
+      sortOrder: Number(row.sort_order || 0)
+    })),
+    financialInstitutions: financialInstitutionsResult.rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      shortName: row.short_name || row.name,
+      type: row.type,
+      logoPath: row.logo_path || '',
+      icon: row.icon || 'landmark',
+      brandColor: row.brand_color || '#94a3b8',
+      secondaryColor: row.secondary_color || '#334155',
+      website: row.website || '',
+      isSystemDefault: Boolean(row.is_system_default),
+      isActive: Boolean(row.is_active),
+      sortOrder: Number(row.sort_order || 0)
+    })),
+    financialAccounts: financialAccountsResult.rows.map((row) => ({
+      id: row.id,
+      institutionId: row.institution_id || '',
+      name: row.name,
+      nickname: row.nickname || '',
+      type: row.type,
+      subtype: row.subtype || '',
+      lastFourDigits: row.last_four_digits || '',
+      cardBrand: row.card_brand || '',
+      color: row.color || '',
+      icon: row.icon || '',
+      initialBalance: Number(row.initial_balance || 0),
+      manualBalance: row.manual_balance === null ? null : Number(row.manual_balance || 0),
+      creditLimit: row.credit_limit === null ? null : Number(row.credit_limit || 0),
+      closingDay: row.closing_day === null ? null : Number(row.closing_day || 0),
+      dueDay: row.due_day === null ? null : Number(row.due_day || 0),
+      includeInTotalBalance: Boolean(row.include_in_total_balance),
+      isDefault: Boolean(row.is_default),
+      isActive: Boolean(row.is_active),
+      archivedAt: row.archived_at ? row.archived_at.toISOString() : '',
+      notes: row.notes || '',
+      externalProvider: row.external_provider || '',
+      externalAccountId: row.external_account_id || '',
+      externalItemId: row.external_item_id || '',
+      lastSyncAt: row.last_sync_at ? row.last_sync_at.toISOString() : '',
+      syncStatus: row.sync_status || '',
+      consentExpiresAt: row.consent_expires_at ? row.consent_expires_at.toISOString() : '',
+      paymentMethodIds: financialAccountMethodsResult.rows
+        .filter((method) => method.financial_account_id === row.id)
+        .map((method) => method.payment_method_id)
+    })),
     transactions: transactionsResult.rows.map((row) => ({
       id: row.id,
       description: row.description,
@@ -440,7 +703,9 @@ async function buildState(userId, client = pool) {
       type: row.type,
       category: row.category,
       date: toDateOnly(row.date),
-      recurring: Boolean(row.recurring)
+      recurring: Boolean(row.recurring),
+      paymentMethodId: row.payment_method_id || '',
+      financialAccountId: row.financial_account_id || ''
     })),
     budgets: budgetsResult.rows.map((row) => ({
       id: row.id,
@@ -476,6 +741,7 @@ async function replaceUserDataset(userId, state, client) {
   const profile = state?.profile || {};
   const goal = state?.goal || {};
   const calculator = state?.calculator || {};
+  const financialAccounts = Array.isArray(state?.financialAccounts) ? state.financialAccounts : [];
   const transactions = Array.isArray(state?.transactions) ? state.transactions : [];
   const budgets = Array.isArray(state?.budgets) ? state.budgets : [];
   const subscriptions = Array.isArray(state?.subscriptions) ? state.subscriptions : [];
@@ -498,6 +764,7 @@ async function replaceUserDataset(userId, state, client) {
   await client.query('DELETE FROM calculator_settings WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM subscription_payments WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
+  await client.query('DELETE FROM financial_accounts WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM budgets WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM subscriptions WHERE user_id = $1', [userId]);
 
@@ -525,11 +792,82 @@ async function replaceUserDataset(userId, state, client) {
     ]
   );
 
+  const validInstitutionIds = new Set((await client.query('SELECT id FROM financial_institutions')).rows.map((row) => row.id));
+  const validPaymentMethodIds = new Set((await client.query('SELECT id FROM payment_methods')).rows.map((row) => row.id));
+  const accountIds = new Set();
+
+  for (const item of financialAccounts) {
+    const accountId = String(item.id || makeId('fa'));
+    const type = ['checking_account', 'savings_account', 'credit_card', 'debit_card', 'cash', 'digital_wallet', 'investment_account', 'prepaid_card', 'benefits_card', 'other'].includes(item.type)
+      ? item.type
+      : 'checking_account';
+    const institutionId = validInstitutionIds.has(String(item.institutionId || '')) ? String(item.institutionId) : null;
+    const lastFourDigits = String(item.lastFourDigits || '').replace(/\D/g, '').slice(0, 4) || null;
+    const closingDay = normalizeDay(item.closingDay);
+    const dueDay = normalizeDay(item.dueDay);
+    const isActive = item.isActive !== false && !item.archivedAt;
+    const archivedAt = isActive ? null : (item.archivedAt || now);
+
+    accountIds.add(accountId);
+    await client.query(
+      `INSERT INTO financial_accounts (
+         id, user_id, institution_id, name, nickname, type, subtype, last_four_digits, card_brand,
+         color, icon, initial_balance, manual_balance, credit_limit, closing_day, due_day,
+         include_in_total_balance, is_default, is_active, archived_at, notes, external_provider,
+         external_account_id, external_item_id, last_sync_at, sync_status, consent_expires_at, created_at, updated_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)`,
+      [
+        accountId,
+        userId,
+        institutionId,
+        String(item.name || item.nickname || 'Conta financeira').trim() || 'Conta financeira',
+        String(item.nickname || '').trim() || null,
+        type,
+        String(item.subtype || '').trim() || null,
+        lastFourDigits,
+        String(item.cardBrand || '').trim() || null,
+        sanitizeColor(item.color),
+        String(item.icon || '').trim() || null,
+        sanitizeMoney(item.initialBalance),
+        item.manualBalance === null || item.manualBalance === undefined || item.manualBalance === '' ? null : sanitizeMoney(item.manualBalance),
+        item.creditLimit === null || item.creditLimit === undefined || item.creditLimit === '' ? null : sanitizeMoney(item.creditLimit),
+        closingDay,
+        dueDay,
+        item.includeInTotalBalance !== false,
+        Boolean(item.isDefault),
+        isActive,
+        archivedAt,
+        String(item.notes || '').trim() || null,
+        String(item.externalProvider || '').trim() || null,
+        String(item.externalAccountId || '').trim() || null,
+        String(item.externalItemId || '').trim() || null,
+        parseOptionalTimestamp(item.lastSyncAt),
+        String(item.syncStatus || '').trim() || null,
+        parseOptionalTimestamp(item.consentExpiresAt),
+        now,
+        now
+      ]
+    );
+
+    const methodIds = Array.isArray(item.paymentMethodIds) ? item.paymentMethodIds : [];
+    for (const methodId of methodIds.filter((id) => validPaymentMethodIds.has(String(id)))) {
+      await client.query(
+        `INSERT INTO financial_account_payment_methods (id, financial_account_id, payment_method_id, is_enabled, created_at)
+         VALUES ($1, $2, $3, TRUE, $4)
+         ON CONFLICT (financial_account_id, payment_method_id) DO UPDATE SET is_enabled = TRUE`,
+        [makeId('fapm'), accountId, String(methodId), now]
+      );
+    }
+  }
+
   for (const item of transactions) {
     const type = ['income', 'expense', 'investment'].includes(item.type) ? item.type : 'expense';
+    const paymentMethodId = validPaymentMethodIds.has(String(item.paymentMethodId || '')) ? String(item.paymentMethodId) : null;
+    const financialAccountId = accountIds.has(String(item.financialAccountId || '')) ? String(item.financialAccountId) : null;
     await client.query(
-      `INSERT INTO transactions (id, user_id, description, amount, type, category, date, recurring, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO transactions (id, user_id, description, amount, type, category, date, recurring, payment_method_id, financial_account_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         String(item.id || makeId('tx')),
         userId,
@@ -539,6 +877,8 @@ async function replaceUserDataset(userId, state, client) {
         String(item.category || 'Outros').trim() || 'Outros',
         String(item.date || utcNow().slice(0, 10)),
         Boolean(item.recurring),
+        paymentMethodId,
+        financialAccountId,
         now,
         now
       ]
@@ -694,6 +1034,24 @@ function sanitizeMoney(value) {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric) || numeric < 0) return 0;
   return Math.round(numeric * 100) / 100;
+}
+
+function normalizeDay(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const day = Number(value);
+  if (!Number.isFinite(day)) return null;
+  return Math.max(1, Math.min(31, Math.trunc(day)));
+}
+
+function sanitizeColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : null;
+}
+
+function parseOptionalTimestamp(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function resolveStaticPath(urlPathname) {
