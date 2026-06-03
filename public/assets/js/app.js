@@ -8,6 +8,7 @@ const routes = [
   { key: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
   { key: 'transactions', label: 'Transações', icon: 'arrow-right-left' },
   { key: 'accounts', label: 'Contas e Cartões', icon: 'wallet-cards' },
+  { key: 'investments', label: 'Investimentos', icon: 'landmark' },
   { key: 'goals', label: 'Metas', icon: 'piggy-bank' },
   { key: 'calculator', label: 'Juros Compostos', icon: 'calculator' },
   { key: 'calendar', label: 'Calendário', icon: 'calendar-days' },
@@ -716,6 +717,8 @@ function renderPage(route) {
       return renderTransactionsPage();
     case 'accounts':
       return renderAccountsPage();
+    case 'investments':
+      return renderInvestmentsPage();
     case 'goals':
       return renderGoalsPage();
     case 'calculator':
@@ -754,7 +757,12 @@ function renderDashboardPage() {
       ${metricCard('Saldo disponível', currency.format(position.availableBalance), 'Disponível agora', position.availableBalance >= 0 ? 'emerald' : 'rose', 'card-enter')}
       ${metricCard('Receitas', currency.format(monthly.income), 'Entradas do mês', 'emerald', 'card-enter card-enter-delay-1')}
       ${metricCard('Despesas', currency.format(monthly.expense), 'Saídas do mês', 'rose', 'card-enter card-enter-delay-2')}
-      ${metricCard('Investimentos', currency.format(monthly.investment), 'Total aportado', 'violet', 'card-enter card-enter-delay-3')}
+      ${metricCard('Total Investido', currency.format(position.investedBalance), 'Acumulado de todos os períodos', 'violet', 'card-enter card-enter-delay-3')}
+    </section>
+
+    <section class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      ${metricCard('Aportado este mês', currency.format(monthly.investment), 'Entradas do mês atual', 'violet', 'card-enter card-enter-delay-4')}
+      ${metricCard('Rentabilidade', currency.format(position.netWorth - position.investedBalance), monthly.investment > 0 ? 'Ganhos estimados' : 'Em espera', 'violet', 'card-enter card-enter-delay-5')}
     </section>
 
     <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.45fr_.95fr]">
@@ -1342,6 +1350,173 @@ function renderAccountsPage() {
         </article>
       </section>
     </section>
+  `;
+}
+
+function renderInvestmentsPage() {
+  const investmentAccounts = state.investmentAccounts || [];
+  const totalInvested = sumAmount(investmentAccounts.map((acc) => acc.currentTotal));
+  const activeInvestments = investmentAccounts.filter((acc) => acc.isActive).length;
+  const investmentTransactions = (state.transactions || []).filter((tx) => tx.type === 'investment');
+  const monthTransactions = getMonthTransactions(investmentTransactions, new Date());
+  const monthInvested = sumAmount(monthTransactions);
+
+  const investmentTypeColors = {
+    stock: 'tag-violet',
+    crypto: 'tag-warning',
+    reits: 'tag-info',
+    fixed_income: 'tag-emerald',
+    fund: 'tag-violet',
+    pension: 'tag-emerald',
+    other: 'tag-slate'
+  };
+
+  return `
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <article class="glass rounded-[28px] p-5 sm:p-6">
+        <form id="investmentAccountForm" data-editing-account-id="" class="space-y-4">
+          <div>
+            <span class="feature-icon feature-icon-violet">${icon('landmark', 'h-5 w-5')}</span>
+            <h2 class="mt-3 text-xl font-semibold tracking-tight">Adicionar investimento</h2>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Corretora/Instituição</label>
+            <select class="input-luxury" name="investmentInstitution" required>
+              <option value="">Selecione uma instituição</option>
+              ${(state.financialInstitutions || []).map((inst) => `
+                <option value="${escapeHtml(inst.id)}" data-logo="${escapeHtml(inst.logoPath)}" data-icon="${escapeHtml(inst.icon)}" data-color="${escapeHtml(inst.brandColor)}">
+                  ${escapeHtml(inst.name)}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Apelido da conta</label>
+            <input class="input-luxury" name="investmentNickname" placeholder="Ex.: Ações Tech" />
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Tipo de investimento</label>
+            <select class="input-luxury" name="investmentType" required>
+              <option value="stock">Ações</option>
+              <option value="crypto">Criptomoedas</option>
+              <option value="reits">Fundos imobiliários</option>
+              <option value="fixed_income">Renda fixa</option>
+              <option value="fund">Fundos</option>
+              <option value="pension">Previdência</option>
+              <option value="other">Outro</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Número da conta (opcional)</label>
+            <input class="input-luxury" name="investmentAccountNumber" placeholder="Ex.: 123456" />
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Capital inicial investido</label>
+            <div class="money-input-wrap">
+              <span>R$</span>
+              <input class="input-luxury money-input" name="investmentInitial" inputmode="decimal" placeholder="0,00" />
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Perfil de risco</label>
+            <select class="input-luxury" name="investmentRiskProfile">
+              <option value="conservative">Conservador</option>
+              <option value="moderate" selected>Moderado</option>
+              <option value="aggressive">Agressivo</option>
+              <option value="balanced">Balanceado</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm text-slate-300">Notas</label>
+            <textarea class="input-luxury" name="investmentNotes" placeholder="Observações..." rows="2"></textarea>
+          </div>
+
+          <div class="flex gap-2">
+            <button class="btn-primary flex-1" type="submit">${icon('plus', 'h-4 w-4')} Adicionar</button>
+            <button class="btn-secondary" id="cancelInvestmentEdit" type="button" style="display:none;">${icon('x', 'h-4 w-4')}</button>
+          </div>
+        </form>
+      </article>
+
+      <div class="space-y-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          ${metricCard('Total Investido', currency.format(totalInvested), 'Valor total acumulado', 'violet', '')}
+          ${metricCard('Contas ativas', `${activeInvestments}`, 'Contas de investimento', 'violet', '')}
+          ${metricCard('Este mês', currency.format(monthInvested), 'Aportes do período', 'violet', '')}
+        </div>
+
+        <article class="glass rounded-[28px] p-5 sm:p-6">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <h3 class="text-lg font-semibold tracking-tight">Suas contas</h3>
+            <input type="text" class="w-48 rounded-lg border border-slate-600 bg-slate-900/50 px-3 py-1 text-sm text-slate-100 placeholder-slate-500" id="searchInvestmentAccount" placeholder="Buscar..." />
+          </div>
+
+          <div id="investmentAccountsList" class="space-y-3">
+            ${investmentAccounts.length ? investmentAccounts.map((acc) => renderInvestmentAccountCard(acc, investmentTypeColors)).join('') : emptyState('Nenhuma conta de investimento cadastrada.')}
+          </div>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function renderInvestmentAccountCard(acc, typeColors = {}) {
+  const typeLabels = {
+    stock: 'Ações',
+    crypto: 'Criptomoedas',
+    reits: 'Fundos Imobiliários',
+    fixed_income: 'Renda Fixa',
+    fund: 'Fundos',
+    pension: 'Previdência',
+    other: 'Outro'
+  };
+
+  const institution = (state.financialInstitutions || []).find((i) => i.id === acc.institutionId);
+  const investmentMonth = (state.transactions || [])
+    .filter((tx) => tx.type === 'investment' && tx.investmentAccountId === acc.id && tx.date.slice(0, 7) === currentPeriodKey())
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
+  return `
+    <article class="rounded-[20px] border ${acc.isActive ? 'border-violet-500/30 bg-violet-500/5' : 'border-slate-600/50 bg-slate-900/30'} p-4 transition hover:border-violet-500/50">
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <div class="flex-1">
+          <h4 class="font-semibold text-slate-100">${escapeHtml(acc.nickname || acc.name)}</h4>
+          <p class="text-sm text-slate-400">${institution?.name || 'Instituição desconhecida'}</p>
+        </div>
+        <div class="flex gap-1">
+          <button class="icon-btn p-1.5" data-edit-investment="${escapeHtml(acc.id)}" title="Editar">${icon('pencil', 'h-4 w-4')}</button>
+          <button class="icon-btn p-1.5" data-delete-investment="${escapeHtml(acc.id)}" title="Deletar">${icon('trash-2', 'h-4 w-4')}</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <span class="text-slate-400">Tipo</span>
+          <p class="font-mono text-slate-200">${typeLabels[acc.investmentType] || acc.investmentType}</p>
+        </div>
+        <div>
+          <span class="text-slate-400">Risco</span>
+          <p class="font-mono text-slate-200 capitalize">${acc.riskProfile}</p>
+        </div>
+        <div>
+          <span class="text-slate-400">Total</span>
+          <p class="font-mono font-semibold text-violet-300">${currency.format(acc.currentTotal)}</p>
+        </div>
+        <div>
+          <span class="text-slate-400">Este mês</span>
+          <p class="font-mono text-slate-200">${currency.format(investmentMonth)}</p>
+        </div>
+      </div>
+
+      ${acc.notes ? `<p class="mt-3 text-xs text-slate-500">${escapeHtml(acc.notes)}</p>` : ''}
+    </article>
   `;
 }
 
@@ -2349,6 +2524,9 @@ function bindRoute(route) {
     case 'accounts':
       bindAccountsPage();
       break;
+    case 'investments':
+      bindInvestmentsPage();
+      break;
     case 'goals':
       bindGoalsPage();
       break;
@@ -2671,6 +2849,117 @@ function bindAccountsPage() {
       render();
     });
   });
+}
+
+function bindInvestmentsPage() {
+  const form = document.getElementById('investmentAccountForm');
+  const cancelBtn = document.getElementById('cancelInvestmentEdit');
+  const searchInput = document.getElementById('searchInvestmentAccount');
+
+  if (form) {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const editingId = form.dataset.editingAccountId;
+      const accountId = editingId || makeId('invacct');
+      const institutionId = String(data.get('investmentInstitution') || '');
+      const nickname = String(data.get('investmentNickname') || '').trim();
+      const type = String(data.get('investmentType') || 'other');
+      const accountNumber = String(data.get('investmentAccountNumber') || '').trim();
+      const initialInvestment = readMoneyAmount(data.get('investmentInitial'));
+      const riskProfile = String(data.get('investmentRiskProfile') || 'balanced');
+      const notes = String(data.get('investmentNotes') || '').trim();
+
+      if (!institutionId || !nickname) {
+        alert('Instituição e apelido são obrigatórios');
+        return;
+      }
+
+      const account = {
+        id: accountId,
+        institutionId,
+        name: nickname,
+        nickname,
+        accountNumber: accountNumber || null,
+        initialInvestment,
+        currentTotal: initialInvestment,
+        currency: 'BRL',
+        investmentType: type,
+        riskProfile,
+        color: '#8b7cf6',
+        icon: 'landmark',
+        notes,
+        isActive: true,
+        archivedAt: ''
+      };
+
+      if (editingId) {
+        const idx = (state.investmentAccounts || []).findIndex((a) => a.id === editingId);
+        if (idx !== -1) {
+          state.investmentAccounts[idx] = { ...state.investmentAccounts[idx], ...account };
+        }
+      } else {
+        state.investmentAccounts = state.investmentAccounts || [];
+        state.investmentAccounts.unshift(account);
+      }
+
+      form.dataset.editingAccountId = '';
+      form.reset();
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      saveState();
+      render();
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      form.dataset.editingAccountId = '';
+      form.reset();
+      cancelBtn.style.display = 'none';
+    });
+  }
+
+  document.querySelectorAll('[data-edit-investment]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const accountId = btn.dataset.editInvestment;
+      const account = (state.investmentAccounts || []).find((a) => a.id === accountId);
+      if (!account) return;
+
+      form.dataset.editingAccountId = accountId;
+      form.querySelector('[name="investmentInstitution"]').value = account.institutionId || '';
+      form.querySelector('[name="investmentNickname"]').value = account.nickname || '';
+      form.querySelector('[name="investmentType"]').value = account.investmentType || 'other';
+      form.querySelector('[name="investmentAccountNumber"]').value = account.accountNumber || '';
+      form.querySelector('[name="investmentInitial"]').value = formatMoney(account.initialInvestment || 0);
+      form.querySelector('[name="investmentRiskProfile"]').value = account.riskProfile || 'balanced';
+      form.querySelector('[name="investmentNotes"]').value = account.notes || '';
+
+      if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+      window.scrollTo(0, 0);
+    });
+  });
+
+  document.querySelectorAll('[data-delete-investment]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const accountId = btn.dataset.deleteInvestment;
+      if (!confirm('Tem certeza que deseja deletar esta conta de investimento?')) {
+        return;
+      }
+      state.investmentAccounts = (state.investmentAccounts || []).filter((a) => a.id !== accountId);
+      saveState();
+      render();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase();
+      document.querySelectorAll('#investmentAccountsList > article').forEach((card) => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(query) ? '' : 'none';
+      });
+    });
+  }
 }
 
 function bindGoalsPage() {
@@ -3124,6 +3413,10 @@ function getAccountById(id) {
   return state.financialAccounts.find((account) => account.id === id) || null;
 }
 
+function getInvestmentAccountById(id) {
+  return (state.investmentAccounts || []).find((account) => account.id === id) || null;
+}
+
 function getPaymentMethodById(id) {
   return getPaymentMethods().find((method) => method.id === id) || null;
 }
@@ -3238,17 +3531,20 @@ function accountOriginBadge(account, institution = getInstitutionById(account?.i
 
 function transactionOriginCell(tx, compact = false) {
   const account = getAccountById(tx.financialAccountId);
-  const institution = getInstitutionById(account?.institutionId);
+  const investmentAccount = getInvestmentAccountById(tx.investmentAccountId);
+  const institution = getInstitutionById(account?.institutionId || investmentAccount?.institutionId);
   const method = getPaymentMethodById(tx.paymentMethodId);
-  if (!account && !method) return '<span class="text-xs text-slate-500">Sem origem</span>';
+  const displayAccount = investmentAccount || account;
+  if (!displayAccount && !method) return '<span class="text-xs text-slate-500">Sem origem</span>';
   return `
-    <div class="origin-cell ${compact ? 'origin-cell-compact' : ''}" style="${institutionStyleVars(institution, account?.color)}">
+    <div class="origin-cell ${compact ? 'origin-cell-compact' : ''}" style="${institutionStyleVars(institution, displayAccount?.color)}">
       <div class="origin-main">
-        ${account ? institutionAvatar(institution, 'h-8 w-8') : method ? `<span class="method-avatar" style="--method-color:${escapeHtml(method.color || '#94a3b8')}">${paymentMethodIcon(method.id, 'h-4 w-4')}</span>` : ''}
+        ${displayAccount ? institutionAvatar(institution, 'h-8 w-8') : method ? `<span class="method-avatar" style="--method-color:${escapeHtml(method.color || '#94a3b8')}">${paymentMethodIcon(method.id, 'h-4 w-4')}</span>` : ''}
         <div class="min-w-0">
-          <div class="truncate text-sm font-semibold text-slate-100">${escapeHtml(account?.nickname || account?.name || method?.name || 'Sem conta')}</div>
+          <div class="truncate text-sm font-semibold text-slate-100">${escapeHtml(displayAccount?.nickname || displayAccount?.name || method?.name || 'Sem conta')}</div>
           <div class="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-400">
             ${method ? `<span>${paymentMethodIcon(method.id, 'h-3 w-3')} ${escapeHtml(shortPaymentMethodLabel(method))}</span>` : ''}
+            ${investmentAccount ? `<span>${escapeHtml(investmentAccount.investmentType || 'Investimento')}</span>` : ''}
             ${institution ? `<span>${escapeHtml(institution.shortName || institution.name)}</span>` : ''}
             ${account?.lastFourDigits ? `<span>final ${escapeHtml(account.lastFourDigits)}</span>` : ''}
           </div>

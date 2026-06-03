@@ -341,6 +341,29 @@ async function initializeSchema() {
       UNIQUE (financial_account_id, payment_method_id)
     );
 
+    CREATE TABLE IF NOT EXISTS investment_accounts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      institution_id TEXT REFERENCES financial_institutions(id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
+      nickname TEXT,
+      account_number TEXT,
+      initial_investment NUMERIC NOT NULL DEFAULT 0,
+      current_total NUMERIC NOT NULL DEFAULT 0,
+      currency TEXT NOT NULL DEFAULT 'BRL',
+      investment_type TEXT NOT NULL,
+      risk_profile TEXT NOT NULL DEFAULT 'balanced',
+      color TEXT,
+      icon TEXT,
+      notes TEXT,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      archived_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT investment_accounts_investment_type_check CHECK (investment_type IN ('stock', 'crypto', 'reits', 'fixed_income', 'fund', 'pension', 'other')),
+      CONSTRAINT investment_accounts_risk_profile_check CHECK (risk_profile IN ('conservative', 'moderate', 'aggressive', 'balanced'))
+    );
+
     CREATE TABLE IF NOT EXISTS budgets (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -383,6 +406,9 @@ async function initializeSchema() {
     CREATE INDEX IF NOT EXISTS idx_financial_accounts_institution_id ON financial_accounts(institution_id);
     CREATE INDEX IF NOT EXISTS idx_financial_accounts_type ON financial_accounts(type);
     CREATE INDEX IF NOT EXISTS idx_financial_accounts_is_active ON financial_accounts(is_active);
+    CREATE INDEX IF NOT EXISTS idx_investment_accounts_user_id ON investment_accounts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_investment_accounts_institution_id ON investment_accounts(institution_id);
+    CREATE INDEX IF NOT EXISTS idx_investment_accounts_is_active ON investment_accounts(is_active);
     CREATE INDEX IF NOT EXISTS idx_budgets_user_id_created_at ON budgets(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id_created_at ON subscriptions(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_subscription_payments_user_id_period ON subscription_payments(user_id, period_month DESC);
@@ -392,10 +418,13 @@ async function initializeSchema() {
   await pool.query('ALTER TABLE goals ADD COLUMN IF NOT EXISTS current_amount NUMERIC NOT NULL DEFAULT 0');
   await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_method_id TEXT');
   await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS financial_account_id TEXT');
+  await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS investment_account_id TEXT');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_financial_account_id ON transactions(financial_account_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_payment_method_id ON transactions(payment_method_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_investment_account_id ON transactions(investment_account_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_user_id_financial_account_id ON transactions(user_id, financial_account_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_user_id_payment_method_id ON transactions(user_id, payment_method_id)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_user_id_investment_account_id ON transactions(user_id, investment_account_id)');
   await pool.query(`
     DO $$
     BEGIN
@@ -408,6 +437,11 @@ async function initializeSchema() {
         ALTER TABLE transactions
           ADD CONSTRAINT transactions_financial_account_id_fkey
           FOREIGN KEY (financial_account_id) REFERENCES financial_accounts(id) ON DELETE RESTRICT;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'transactions_investment_account_id_fkey') THEN
+        ALTER TABLE transactions
+          ADD CONSTRAINT transactions_investment_account_id_fkey
+          FOREIGN KEY (investment_account_id) REFERENCES investment_accounts(id) ON DELETE RESTRICT;
       END IF;
     END $$;
   `);
@@ -556,7 +590,7 @@ async function findUserByToken(token, client = pool) {
 async function buildState(userId, client = pool) {
   await ensureDatabase();
 
-  const [userResult, goalResult, calculatorResult, paymentMethodsResult, financialInstitutionsResult, financialAccountsResult, financialAccountMethodsResult, transactionsResult, budgetsResult, subscriptionsResult, subscriptionPaymentsResult] = await Promise.all([
+  const [userResult, goalResult, calculatorResult, paymentMethodsResult, financialInstitutionsResult, financialAccountsResult, financialAccountMethodsResult, investmentAccountsResult, transactionsResult, budgetsResult, subscriptionsResult, subscriptionPaymentsResult] = await Promise.all([
     client.query('SELECT id, name, email FROM users WHERE id = $1 LIMIT 1', [userId]),
     client.query('SELECT name, target, current_amount FROM goals WHERE user_id = $1 LIMIT 1', [userId]),
     client.query('SELECT initial_amount, monthly_contribution, annual_rate, years FROM calculator_settings WHERE user_id = $1 LIMIT 1', [userId]),
@@ -590,7 +624,15 @@ async function buildState(userId, client = pool) {
       [userId]
     ),
     client.query(
-      `SELECT id, description, amount, type, category, date, recurring, payment_method_id, financial_account_id
+      `SELECT id, user_id, institution_id, name, nickname, account_number, initial_investment, current_total, currency,
+              investment_type, risk_profile, color, icon, notes, is_active, archived_at
+       FROM investment_accounts
+       WHERE user_id = $1
+       ORDER BY is_active DESC, created_at DESC`,
+      [userId]
+    ),
+    client.query(
+      `SELECT id, description, amount, type, category, date, recurring, payment_method_id, financial_account_id, investment_account_id
        FROM transactions
        WHERE user_id = $1
        ORDER BY date DESC, created_at DESC`,
@@ -696,6 +738,23 @@ async function buildState(userId, client = pool) {
         .filter((method) => method.financial_account_id === row.id)
         .map((method) => method.payment_method_id)
     })),
+    investmentAccounts: investmentAccountsResult.rows.map((row) => ({
+      id: row.id,
+      institutionId: row.institution_id || '',
+      name: row.name,
+      nickname: row.nickname || '',
+      accountNumber: row.account_number || '',
+      initialInvestment: Number(row.initial_investment || 0),
+      currentTotal: Number(row.current_total || 0),
+      currency: row.currency || 'BRL',
+      investmentType: row.investment_type,
+      riskProfile: row.risk_profile || 'balanced',
+      color: row.color || '',
+      icon: row.icon || '',
+      notes: row.notes || '',
+      isActive: Boolean(row.is_active),
+      archivedAt: row.archived_at ? row.archived_at.toISOString() : ''
+    })),
     transactions: transactionsResult.rows.map((row) => ({
       id: row.id,
       description: row.description,
@@ -705,7 +764,8 @@ async function buildState(userId, client = pool) {
       date: toDateOnly(row.date),
       recurring: Boolean(row.recurring),
       paymentMethodId: row.payment_method_id || '',
-      financialAccountId: row.financial_account_id || ''
+      financialAccountId: row.financial_account_id || '',
+      investmentAccountId: row.investment_account_id || ''
     })),
     budgets: budgetsResult.rows.map((row) => ({
       id: row.id,
@@ -742,6 +802,7 @@ async function replaceUserDataset(userId, state, client) {
   const goal = state?.goal || {};
   const calculator = state?.calculator || {};
   const financialAccounts = Array.isArray(state?.financialAccounts) ? state.financialAccounts : [];
+  const investmentAccounts = Array.isArray(state?.investmentAccounts) ? state.investmentAccounts : [];
   const transactions = Array.isArray(state?.transactions) ? state.transactions : [];
   const budgets = Array.isArray(state?.budgets) ? state.budgets : [];
   const subscriptions = Array.isArray(state?.subscriptions) ? state.subscriptions : [];
@@ -765,6 +826,7 @@ async function replaceUserDataset(userId, state, client) {
   await client.query('DELETE FROM subscription_payments WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM transactions WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM financial_accounts WHERE user_id = $1', [userId]);
+  await client.query('DELETE FROM investment_accounts WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM budgets WHERE user_id = $1', [userId]);
   await client.query('DELETE FROM subscriptions WHERE user_id = $1', [userId]);
 
@@ -795,6 +857,7 @@ async function replaceUserDataset(userId, state, client) {
   const validInstitutionIds = new Set((await client.query('SELECT id FROM financial_institutions')).rows.map((row) => row.id));
   const validPaymentMethodIds = new Set((await client.query('SELECT id FROM payment_methods')).rows.map((row) => row.id));
   const accountIds = new Set();
+  const investmentAccountIds = new Set();
 
   for (const item of financialAccounts) {
     const accountId = String(item.id || makeId('fa'));
@@ -861,13 +924,51 @@ async function replaceUserDataset(userId, state, client) {
     }
   }
 
+  for (const item of investmentAccounts) {
+    const investmentAccountId = String(item.id || makeId('invacct'));
+    const institutionId = validInstitutionIds.has(String(item.institutionId || '')) ? String(item.institutionId) : null;
+    const investmentType = ['stock', 'crypto', 'reits', 'fixed_income', 'fund', 'pension', 'other'].includes(item.investmentType) ? item.investmentType : 'other';
+    const riskProfile = ['conservative', 'moderate', 'aggressive', 'balanced'].includes(item.riskProfile) ? item.riskProfile : 'balanced';
+    const isActive = item.isActive !== false;
+    const archivedAt = !isActive && item.archivedAt ? parseOptionalTimestamp(item.archivedAt) : null;
+
+    investmentAccountIds.add(investmentAccountId);
+      `INSERT INTO investment_accounts (
+         id, user_id, institution_id, name, nickname, account_number, initial_investment, current_total,
+         currency, investment_type, risk_profile, color, icon, notes, is_active, archived_at, created_at, updated_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+      [
+        investmentAccountId,
+        userId,
+        institutionId,
+        String(item.name || item.nickname || 'Conta de investimento').trim() || 'Conta de investimento',
+        String(item.nickname || '').trim() || null,
+        String(item.accountNumber || '').trim() || null,
+        sanitizeMoney(item.initialInvestment),
+        sanitizeMoney(item.currentTotal),
+        String(item.currency || 'BRL').trim() || 'BRL',
+        investmentType,
+        riskProfile,
+        sanitizeColor(item.color),
+        String(item.icon || '').trim() || null,
+        String(item.notes || '').trim() || null,
+        isActive,
+        archivedAt,
+        now,
+        now
+      ]
+    );
+  }
+
   for (const item of transactions) {
     const type = ['income', 'expense', 'investment'].includes(item.type) ? item.type : 'expense';
     const paymentMethodId = validPaymentMethodIds.has(String(item.paymentMethodId || '')) ? String(item.paymentMethodId) : null;
     const financialAccountId = accountIds.has(String(item.financialAccountId || '')) ? String(item.financialAccountId) : null;
+    const investmentAccountId = investmentAccountIds.has(String(item.investmentAccountId || '')) ? String(item.investmentAccountId) : null;
     await client.query(
-      `INSERT INTO transactions (id, user_id, description, amount, type, category, date, recurring, payment_method_id, financial_account_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      `INSERT INTO transactions (id, user_id, description, amount, type, category, date, recurring, payment_method_id, financial_account_id, investment_account_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         String(item.id || makeId('tx')),
         userId,
@@ -879,6 +980,7 @@ async function replaceUserDataset(userId, state, client) {
         Boolean(item.recurring),
         paymentMethodId,
         financialAccountId,
+        investmentAccountId,
         now,
         now
       ]
