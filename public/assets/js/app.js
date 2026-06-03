@@ -760,9 +760,8 @@ function renderDashboardPage() {
       ${metricCard('Total Investido', currency.format(position.investedBalance), 'Acumulado de todos os períodos', 'violet', 'card-enter card-enter-delay-3')}
     </section>
 
-    <section class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-2">
       ${metricCard('Aportado este mês', currency.format(monthly.investment), 'Entradas do mês atual', 'violet', 'card-enter card-enter-delay-4')}
-      ${metricCard('Rentabilidade', currency.format(position.netWorth - position.investedBalance), monthly.investment > 0 ? 'Ganhos estimados' : 'Em espera', 'violet', 'card-enter card-enter-delay-5')}
     </section>
 
     <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.45fr_.95fr]">
@@ -1358,7 +1357,7 @@ function renderInvestmentsPage() {
   const totalInvested = sumAmount(investmentAccounts.map((acc) => acc.currentTotal));
   const activeInvestments = investmentAccounts.filter((acc) => acc.isActive).length;
   const investmentTransactions = (state.transactions || []).filter((tx) => tx.type === 'investment');
-  const monthTransactions = getMonthTransactions(investmentTransactions, new Date());
+  const monthTransactions = getMonthlyTransactions(new Date()).filter((tx) => tx.type === 'investment');
   const monthInvested = sumAmount(monthTransactions);
 
   const investmentTypeColors = {
@@ -1446,10 +1445,9 @@ function renderInvestmentsPage() {
       </article>
 
       <div class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          ${metricCard('Total Investido', currency.format(totalInvested), 'Valor total acumulado', 'violet', '')}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          ${metricCard('Total Investido', currency.format(totalInvested), 'Valor acumulado', 'violet', '')}
           ${metricCard('Contas ativas', `${activeInvestments}`, 'Contas de investimento', 'violet', '')}
-          ${metricCard('Este mês', currency.format(monthInvested), 'Aportes do período', 'violet', '')}
         </div>
 
         <article class="glass rounded-[28px] p-5 sm:p-6">
