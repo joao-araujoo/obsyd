@@ -933,6 +933,7 @@ async function replaceUserDataset(userId, state, client) {
     const archivedAt = !isActive && item.archivedAt ? parseOptionalTimestamp(item.archivedAt) : null;
 
     investmentAccountIds.add(investmentAccountId);
+    await client.query(
       `INSERT INTO investment_accounts (
          id, user_id, institution_id, name, nickname, account_number, initial_investment, current_total,
          currency, investment_type, risk_profile, color, icon, notes, is_active, archived_at, created_at, updated_at
