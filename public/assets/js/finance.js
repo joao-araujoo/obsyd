@@ -8,8 +8,20 @@
   const TYPES = Object.freeze({
     INCOME: 'income',
     EXPENSE: 'expense',
-    INVESTMENT: 'investment'
+    INVESTMENT: 'investment',
+    INVESTMENT_DEPOSIT: 'investment_deposit',
+    INVESTMENT_WITHDRAWAL: 'investment_withdrawal',
+    INVESTMENT_GAIN: 'investment_gain',
+    INVESTMENT_LOSS: 'investment_loss'
   });
+
+  const INVESTMENT_TYPES = new Set([
+    TYPES.INVESTMENT,
+    TYPES.INVESTMENT_DEPOSIT,
+    TYPES.INVESTMENT_WITHDRAWAL,
+    TYPES.INVESTMENT_GAIN,
+    TYPES.INVESTMENT_LOSS
+  ]);
 
   function toCents(value) {
     const numeric = Number(value);
@@ -69,21 +81,38 @@
     const totals = {
       income: 0,
       expense: 0,
-      investment: 0
+      investment: 0,
+      investmentDeposit: 0,
+      investmentWithdrawal: 0,
+      investmentGain: 0,
+      investmentLoss: 0
     };
 
     (Array.isArray(transactions) ? transactions : []).forEach((item) => {
       const tx = normalizeTransaction(item);
-      totals[tx.type] = addMoney(totals[tx.type], tx.amount);
+      if (tx.type === TYPES.INCOME || tx.type === TYPES.EXPENSE) {
+        totals[tx.type] = addMoney(totals[tx.type], tx.amount);
+      } else if (tx.type === TYPES.INVESTMENT || tx.type === TYPES.INVESTMENT_DEPOSIT) {
+        totals.investment = addMoney(totals.investment, tx.amount);
+        totals.investmentDeposit = addMoney(totals.investmentDeposit, tx.amount);
+      } else if (tx.type === TYPES.INVESTMENT_WITHDRAWAL) {
+        totals.investmentWithdrawal = addMoney(totals.investmentWithdrawal, tx.amount);
+      } else if (tx.type === TYPES.INVESTMENT_GAIN) {
+        totals.investmentGain = addMoney(totals.investmentGain, tx.amount);
+      } else if (tx.type === TYPES.INVESTMENT_LOSS) {
+        totals.investmentLoss = addMoney(totals.investmentLoss, tx.amount);
+      }
     });
 
     const economy = subtractMoney(totals.income, totals.expense);
-    const netCashFlow = subtractMoney(totals.income, totals.expense, totals.investment);
+    const netCashFlow = addMoney(subtractMoney(totals.income, totals.expense, totals.investmentDeposit), totals.investmentWithdrawal);
+    const investmentVariation = subtractMoney(totals.investmentGain, totals.investmentLoss);
 
     return {
       ...totals,
       economy,
       netCashFlow,
+      investmentVariation,
       savingsRate: totals.income > 0 ? Math.max(0, (economy / totals.income) * 100) : 0
     };
   }
@@ -96,19 +125,59 @@
     return summarizeTransactions(transactions).netCashFlow;
   }
 
-  function computeInvestedBalance(transactions) {
-    return summarizeTransactions(transactions).investment;
+  function getInvestmentLedgerBalance(transactions, investmentAccountId) {
+    return (Array.isArray(transactions) ? transactions : []).reduce((balance, item) => {
+      const tx = normalizeTransaction(item);
+      if (!INVESTMENT_TYPES.has(tx.type)) return balance;
+      if (investmentAccountId !== undefined && String(tx.investmentAccountId || '') !== String(investmentAccountId || '')) return balance;
+      if (tx.type === TYPES.INVESTMENT || tx.type === TYPES.INVESTMENT_DEPOSIT || tx.type === TYPES.INVESTMENT_GAIN) {
+        return addMoney(balance, tx.amount);
+      }
+      if (tx.type === TYPES.INVESTMENT_WITHDRAWAL || tx.type === TYPES.INVESTMENT_LOSS) {
+        return subtractMoney(balance, tx.amount);
+      }
+      return balance;
+    }, 0);
   }
 
-  function computeFinancialPosition(transactions, baseDate) {
+  function hasInvestmentLedger(transactions, investmentAccountId) {
+    return (Array.isArray(transactions) ? transactions : []).some((item) => {
+      const tx = normalizeTransaction(item);
+      return INVESTMENT_TYPES.has(tx.type) && String(tx.investmentAccountId || '') === String(investmentAccountId || '');
+    });
+  }
+
+  function computeInvestmentAccountBalance(account, transactions) {
+    if (!account) return 0;
+    if (hasInvestmentLedger(transactions, account.id)) {
+      return Math.max(0, getInvestmentLedgerBalance(transactions, account.id));
+    }
+    return Math.max(0, fromCents(toCents(account.currentTotal ?? account.initialInvestment ?? 0)));
+  }
+
+  function computeInvestedBalance(transactions, investmentAccounts = []) {
+    const accounts = Array.isArray(investmentAccounts) ? investmentAccounts : [];
+    const accountIds = new Set(accounts.map((account) => String(account.id || '')));
+    const accountBalance = accounts.reduce((sum, account) => addMoney(sum, computeInvestmentAccountBalance(account, transactions)), 0);
+    if (accounts.length > 0) return Math.max(0, accountBalance);
+
+    const unassignedLedger = getInvestmentLedgerBalance((Array.isArray(transactions) ? transactions : []).filter((tx) => {
+      const id = String(tx?.investmentAccountId || '');
+      return !id || !accountIds.has(id);
+    }));
+    return Math.max(0, addMoney(accountBalance, unassignedLedger));
+  }
+
+  function computeFinancialPosition(transactions, baseDate, investmentAccounts = []) {
     const monthly = summarizeMonth(transactions, baseDate);
     const availableBalance = computeAvailableBalance(transactions);
-    const investedBalance = computeInvestedBalance(transactions);
+    const investedBalance = computeInvestedBalance(transactions, investmentAccounts);
 
     return {
       monthly,
       availableBalance,
       investedBalance,
+      investmentVariation: summarizeTransactions(transactions).investmentVariation,
       netWorth: addMoney(availableBalance, investedBalance)
     };
   }
@@ -184,6 +253,9 @@
         income: subtractMoney(currentSummary.income, previousSummary.income),
         expense: subtractMoney(currentSummary.expense, previousSummary.expense),
         investment: subtractMoney(currentSummary.investment, previousSummary.investment),
+        investmentDeposit: subtractMoney(currentSummary.investmentDeposit, previousSummary.investmentDeposit),
+        investmentWithdrawal: subtractMoney(currentSummary.investmentWithdrawal, previousSummary.investmentWithdrawal),
+        investmentVariation: subtractMoney(currentSummary.investmentVariation, previousSummary.investmentVariation),
         netCashFlow: subtractMoney(currentSummary.netCashFlow, previousSummary.netCashFlow)
       }
     };
@@ -191,6 +263,7 @@
 
   return {
     TYPES,
+    INVESTMENT_TYPES,
     toCents,
     fromCents,
     addMoney,
@@ -202,6 +275,9 @@
     summarizeTransactions,
     summarizeMonth,
     computeAvailableBalance,
+    getInvestmentLedgerBalance,
+    hasInvestmentLedger,
+    computeInvestmentAccountBalance,
     computeInvestedBalance,
     computeFinancialPosition,
     groupExpenseByCategory,

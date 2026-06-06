@@ -261,7 +261,7 @@ async function initializeSchema() {
       recurring BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'investment'))
+      CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'investment', 'investment_deposit', 'investment_withdrawal', 'investment_gain', 'investment_loss'))
     );
 
     CREATE TABLE IF NOT EXISTS payment_methods (
@@ -419,6 +419,12 @@ async function initializeSchema() {
   await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_method_id TEXT');
   await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS financial_account_id TEXT');
   await pool.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS investment_account_id TEXT');
+  await pool.query('ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check');
+  await pool.query(`
+    ALTER TABLE transactions
+      ADD CONSTRAINT transactions_type_check
+      CHECK (type IN ('income', 'expense', 'investment', 'investment_deposit', 'investment_withdrawal', 'investment_gain', 'investment_loss'))
+  `);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_financial_account_id ON transactions(financial_account_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_payment_method_id ON transactions(payment_method_id)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_transactions_investment_account_id ON transactions(investment_account_id)');
@@ -963,7 +969,7 @@ async function replaceUserDataset(userId, state, client) {
   }
 
   for (const item of transactions) {
-    const type = ['income', 'expense', 'investment'].includes(item.type) ? item.type : 'expense';
+    const type = ['income', 'expense', 'investment', 'investment_deposit', 'investment_withdrawal', 'investment_gain', 'investment_loss'].includes(item.type) ? item.type : 'expense';
     const paymentMethodId = validPaymentMethodIds.has(String(item.paymentMethodId || '')) ? String(item.paymentMethodId) : null;
     const financialAccountId = accountIds.has(String(item.financialAccountId || '')) ? String(item.financialAccountId) : null;
     const investmentAccountId = investmentAccountIds.has(String(item.investmentAccountId || '')) ? String(item.investmentAccountId) : null;

@@ -16,6 +16,9 @@ test('summarizes May 2026 transactions with investment as cash outflow', () => {
   assert.equal(summary.income, 2500);
   assert.equal(summary.expense, 100.79);
   assert.equal(summary.investment, 500);
+  assert.equal(summary.investmentDeposit, 500);
+  assert.equal(summary.investmentWithdrawal, 0);
+  assert.equal(summary.investmentVariation, 0);
   assert.equal(summary.economy, 2399.21);
   assert.equal(summary.netCashFlow, 1899.21);
   assert.equal(Number(summary.savingsRate.toFixed(2)), 95.97);
@@ -27,6 +30,56 @@ test('computes available balance and financial position consistently', () => {
   assert.equal(position.availableBalance, 1899.21);
   assert.equal(position.investedBalance, 500);
   assert.equal(position.netWorth, 2399.21);
+});
+
+test('keeps vault transfers internal while gains and losses change net worth', () => {
+  const vaults = [{ id: 'vault_1', name: 'Reserva', currentTotal: 0 }];
+  const transactions = [
+    { description: 'Salário', amount: 3000, type: 'income', category: 'Salário', date: '2026-05-01' },
+    { description: 'Mercado', amount: 300, type: 'expense', category: 'Alimentação', date: '2026-05-02' },
+    { description: 'Aporte reserva', amount: 1000, type: 'investment_deposit', category: 'Aporte em investimento', date: '2026-05-03', investmentAccountId: 'vault_1' },
+    { description: 'Resgate reserva', amount: 200, type: 'investment_withdrawal', category: 'Resgate de investimento', date: '2026-05-04', investmentAccountId: 'vault_1' },
+    { description: 'Rendimento CDB', amount: 50, type: 'investment_gain', category: 'Rendimento de investimento', date: '2026-05-05', investmentAccountId: 'vault_1' },
+    { description: 'Marcação negativa', amount: 20, type: 'investment_loss', category: 'Perda de investimento', date: '2026-05-06', investmentAccountId: 'vault_1' }
+  ];
+
+  const summary = finance.summarizeMonth(transactions, new Date(2026, 4, 1));
+  const position = finance.computeFinancialPosition(transactions, new Date(2026, 4, 1), vaults);
+
+  assert.equal(summary.investmentDeposit, 1000);
+  assert.equal(summary.investmentWithdrawal, 200);
+  assert.equal(summary.investmentGain, 50);
+  assert.equal(summary.investmentLoss, 20);
+  assert.equal(summary.netCashFlow, 1900);
+  assert.equal(summary.investmentVariation, 30);
+  assert.equal(position.availableBalance, 1900);
+  assert.equal(position.investedBalance, 830);
+  assert.equal(position.netWorth, 2730);
+});
+
+test('uses current investment account total only as legacy fallback', () => {
+  const vaults = [
+    { id: 'legacy_vault', name: 'Carteira antiga', currentTotal: 750 },
+    { id: 'ledger_vault', name: 'Carteira com histórico', currentTotal: 9999 }
+  ];
+  const transactions = [
+    { description: 'Aporte', amount: 400, type: 'investment_deposit', category: 'Aporte em investimento', date: '2026-05-03', investmentAccountId: 'ledger_vault' },
+    { description: 'Rendimento', amount: 25, type: 'investment_gain', category: 'Rendimento de investimento', date: '2026-05-05', investmentAccountId: 'ledger_vault' }
+  ];
+
+  assert.equal(finance.computeInvestmentAccountBalance(vaults[0], transactions), 750);
+  assert.equal(finance.computeInvestmentAccountBalance(vaults[1], transactions), 425);
+  assert.equal(finance.computeInvestedBalance(transactions, vaults), 1175);
+});
+
+test('does not mix old unassigned investment ledger with explicit vaults', () => {
+  const vaults = [{ id: 'real_vault', name: 'Cofrinho real', currentTotal: 1000 }];
+  const transactions = [
+    { description: 'Investimento antigo sem cofrinho', amount: 1000, type: 'investment', category: 'Investimentos', date: '2026-05-03' }
+  ];
+
+  assert.equal(finance.computeInvestedBalance(transactions, []), 1000);
+  assert.equal(finance.computeInvestedBalance(transactions, vaults), 1000);
 });
 
 test('groups all monthly expenses by category, including same-day transactions', () => {

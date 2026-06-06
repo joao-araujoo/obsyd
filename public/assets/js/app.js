@@ -7,17 +7,20 @@ const app = document.getElementById('app');
 const routes = [
   { key: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
   { key: 'transactions', label: 'Transações', icon: 'arrow-right-left' },
-  { key: 'accounts', label: 'Contas e Cartões', icon: 'wallet-cards' },
-  { key: 'investments', label: 'Investimentos', icon: 'landmark' },
-  { key: 'goals', label: 'Metas', icon: 'piggy-bank' },
-  { key: 'calculator', label: 'Juros Compostos', icon: 'calculator' },
-  { key: 'calendar', label: 'Calendário', icon: 'calendar-days' },
-  { key: 'budgets', label: 'Orçamentos', icon: 'wallet-cards' },
-  { key: 'subscriptions', label: 'Assinaturas', icon: 'repeat-2' },
+  { key: 'investments', label: 'Cofrinhos', icon: 'piggy-bank' },
+  { key: 'accounts', label: 'Contas', icon: 'landmark' },
+  { key: 'budgets', label: 'Categorias', icon: 'tags' },
   { key: 'reports', label: 'Relatórios', icon: 'chart-no-axes-combined' },
+  { key: 'backup', label: 'Configurações', icon: 'settings' },
+  { key: 'goals', label: 'Meta principal', icon: 'target' },
+  { key: 'calendar', label: 'Calendário', icon: 'calendar-days' },
+  { key: 'subscriptions', label: 'Assinaturas', icon: 'repeat-2' },
+  { key: 'calculator', label: 'Juros Compostos', icon: 'calculator' },
   { key: 'alerts', label: 'Alertas', icon: 'bell-ring' },
-  { key: 'backup', label: 'Backup', icon: 'database-backup' }
 ];
+
+const primaryNavKeys = ['dashboard', 'transactions', 'investments', 'accounts', 'budgets', 'reports', 'backup'];
+const secondaryNavKeys = ['goals', 'calendar', 'subscriptions', 'calculator', 'alerts'];
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
@@ -116,8 +119,12 @@ let ui = {
 };
 let charts = {
   dashboard: null,
+  dashboardAllocation: null,
+  investmentAllocation: null,
   reportCategory: null,
-  reportBalance: null
+  reportBalance: null,
+  reportIncomeExpense: null,
+  reportInvestment: null
 };
 
 document.addEventListener('DOMContentLoaded', initialize);
@@ -163,6 +170,7 @@ function mergeDefaults(saved) {
     paymentMethods: Array.isArray(saved.paymentMethods) ? saved.paymentMethods : base.paymentMethods,
     financialInstitutions: Array.isArray(saved.financialInstitutions) ? saved.financialInstitutions : base.financialInstitutions,
     financialAccounts: Array.isArray(saved.financialAccounts) ? saved.financialAccounts : base.financialAccounts,
+    investmentAccounts: Array.isArray(saved.investmentAccounts) ? saved.investmentAccounts : base.investmentAccounts,
     transactions: Array.isArray(saved.transactions) ? saved.transactions : base.transactions,
     budgets: Array.isArray(saved.budgets) ? saved.budgets : base.budgets,
     subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : base.subscriptions
@@ -331,6 +339,7 @@ function getDefaultState(profileSource = {}) {
     paymentMethods: getFallbackPaymentMethods(),
     financialInstitutions: getFallbackFinancialInstitutions(),
     financialAccounts: [],
+    investmentAccounts: [],
     transactions: [],
     budgets: [],
     subscriptions: []
@@ -572,30 +581,48 @@ function renderShell(pageTitle, content) {
   const current = getRoute();
   const headerCopy = getHeaderCopy(current, pageTitle);
   return `
-    <div class="min-h-[100dvh] lg:grid lg:grid-cols-[304px_minmax(0,1fr)]">
+    <div class="app-shell min-h-[100dvh] lg:grid lg:grid-cols-[288px_minmax(0,1fr)]">
       ${renderToastRegion()}
       <div id="sidebarOverlay" class="${ui.sidebarOpen ? 'fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden' : 'hidden'}"></div>
 
-      <aside id="sidebar" class="mobile-drawer glass-strong fixed left-2 top-2 z-50 h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-[28px] border border-white/10 px-4 py-4 shadow-glow ${ui.sidebarOpen ? 'open' : ''} lg:sticky lg:left-0 lg:top-0 lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[304px] lg:rounded-none lg:border-l-0 lg:border-t-0 lg:border-b-0 lg:px-5 lg:py-5">
+      <aside id="sidebar" class="mobile-drawer app-sidebar fixed left-2 top-2 z-50 h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-[28px] border border-white/10 px-4 py-4 shadow-glow ${ui.sidebarOpen ? 'open' : ''} lg:sticky lg:left-0 lg:top-0 lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[288px] lg:rounded-none lg:border-l-0 lg:border-t-0 lg:border-b-0 lg:px-5 lg:py-5">
         <div class="flex h-full min-h-0 flex-col">
           <div class="flex items-center justify-between gap-3">
             <a href="#/dashboard" class="flex min-w-0 items-center gap-3">
               <img src="./assets/img/obsyd-mark.svg" alt="Logo Obsyd" class="h-12 w-12 shrink-0" />
               <div class="min-w-0">
                 <div class="truncate text-base font-semibold tracking-tight text-white">${BRAND_NAME}</div>
-                <div class="truncate text-[11px] uppercase tracking-[0.28em] text-slate-500">Sistema financeiro pessoal</div>
+                <div class="truncate text-[11px] uppercase tracking-[0.28em] text-slate-500">Wealth cockpit</div>
               </div>
             </a>
             <button id="closeSidebarBtn" class="btn-secondary h-11 w-11 shrink-0 p-0 lg:hidden" aria-label="Fechar menu">${icon('x', 'h-5 w-5')}</button>
           </div>
 
-          <nav class="sidebar-nav mt-5 flex-1 space-y-2 overflow-y-auto pr-1">
-            ${routes.map((route) => `
+          <div class="sidebar-balance-card mt-5">
+            <p>Saldo disponível</p>
+            <strong>${currency.format(finance.computeFinancialPosition(state.transactions, new Date(), state.investmentAccounts).availableBalance)}</strong>
+            <span>${currency.format(finance.computeFinancialPosition(state.transactions, new Date(), state.investmentAccounts).netWorth)} de patrimônio</span>
+          </div>
+
+          <nav class="sidebar-nav mt-5 flex-1 space-y-5 overflow-y-auto pr-1">
+            <div class="space-y-2">
+              <p class="sidebar-section-label">Principal</p>
+              ${routes.filter((route) => primaryNavKeys.includes(route.key)).map((route) => `
               <a href="#/${route.key}" class="sidebar-link ${current === route.key ? 'active' : ''}">
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300">${icon(route.icon, 'h-4 w-4')}</span>
                 <span class="truncate font-medium">${route.label}</span>
               </a>
-            `).join('')}
+              `).join('')}
+            </div>
+            <div class="space-y-2">
+              <p class="sidebar-section-label">Ferramentas</p>
+              ${routes.filter((route) => secondaryNavKeys.includes(route.key)).map((route) => `
+              <a href="#/${route.key}" class="sidebar-link compact ${current === route.key ? 'active' : ''}">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300">${icon(route.icon, 'h-4 w-4')}</span>
+                <span class="truncate font-medium">${route.label}</span>
+              </a>
+              `).join('')}
+            </div>
           </nav>
 
           <div class="mt-4 shrink-0 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.045] p-4">
@@ -617,9 +644,10 @@ function renderShell(pageTitle, content) {
       <div class="min-w-0">
         ${renderAppHeader(headerCopy)}
 
-        <main class="mx-auto max-w-[1600px] px-4 py-6 pb-24 sm:px-6 lg:px-8">
+        <main class="mx-auto max-w-[1600px] px-4 py-6 pb-28 sm:px-6 lg:px-8">
           ${content}
         </main>
+        ${renderMobileNavigation(current)}
       </div>
     </div>
   `;
@@ -673,9 +701,24 @@ function renderQuickActions() {
   return `
     <nav class="quick-actions" aria-label="Ações rápidas">
       <a href="#/transactions" class="quick-action primary">${icon('plus', 'h-3.5 w-3.5')} Nova transação</a>
-      <a href="#/accounts" class="quick-action">${icon('credit-card', 'h-3.5 w-3.5')} Conta/cartão</a>
+      <a href="#/investments" class="quick-action">${icon('arrow-up-right', 'h-3.5 w-3.5')} Aportar</a>
+      <a href="#/investments" class="quick-action">${icon('arrow-down-left', 'h-3.5 w-3.5')} Resgatar</a>
+      <a href="#/investments" class="quick-action">${icon('piggy-bank', 'h-3.5 w-3.5')} Criar cofrinho</a>
       <a href="#/reports" class="quick-action">${icon('chart-no-axes-combined', 'h-3.5 w-3.5')} Relatórios</a>
-      <a href="#/backup" class="quick-action">${icon('download', 'h-3.5 w-3.5')} Backup</a>
+    </nav>
+  `;
+}
+
+function renderMobileNavigation(current) {
+  const mobileKeys = ['dashboard', 'transactions', 'investments', 'reports', 'backup'];
+  return `
+    <nav class="mobile-bottom-nav lg:hidden" aria-label="Navegação principal mobile">
+      ${routes.filter((route) => mobileKeys.includes(route.key)).map((route) => `
+        <a href="#/${route.key}" class="mobile-nav-item ${current === route.key ? 'active' : ''}">
+          ${icon(route.icon, 'h-5 w-5')}
+          <span>${escapeHtml(route.key === 'backup' ? 'Config' : route.label.split(' ')[0])}</span>
+        </a>
+      `).join('')}
     </nav>
   `;
 }
@@ -691,15 +734,16 @@ function getHeaderCopy(route, fallbackTitle) {
   const subtitleByRoute = {
     dashboard: `Resumo financeiro de ${monthLabel.format(new Date())}.`,
     transactions: 'Registre, filtre e acompanhe seus movimentos.',
-    accounts: 'Gerencie bancos, cartões e métodos de pagamento.',
-    goals: 'Acompanhe metas e aportes planejados.',
+    accounts: 'Gerencie bancos, cartões, corretoras e métodos de pagamento.',
+    investments: 'Controle cofrinhos, aportes, resgates, rendimentos e perdas.',
+    goals: 'Acompanhe sua meta principal e aportes planejados.',
     calculator: 'Projete juros compostos e patrimônio futuro.',
     calendar: 'Veja vencimentos e movimentações por data.',
     budgets: 'Controle limites mensais por categoria.',
     subscriptions: 'Acompanhe recorrências e pagamentos.',
     reports: 'Analise gastos, receitas e evolução financeira.',
     alerts: 'Revise sinais que merecem atenção.',
-    backup: 'Exporte, importe e proteja seus dados.'
+    backup: 'Ajuste perfil, backup e proteção de dados.'
   };
 
   return {
@@ -741,7 +785,7 @@ function renderPage(route) {
 }
 
 function renderDashboardPage() {
-  const position = finance.computeFinancialPosition(state.transactions, new Date());
+  const position = finance.computeFinancialPosition(state.transactions, new Date(), state.investmentAccounts);
   const monthly = position.monthly;
   const budgetStatus = getBudgetStatus();
   const dueSoon = getUpcomingBills(7);
@@ -750,35 +794,27 @@ function renderDashboardPage() {
   const budgetPct = budgetStatus.totalLimit > 0 ? Math.min(100, (budgetStatus.totalSpent / budgetStatus.totalLimit) * 100) : 0;
   const recent = getSortedTransactions().slice(0, 6);
   const insights = buildFinancialInsights();
-  const accountSummary = getPaymentSourceSummary();
+  const topInvestments = getInvestmentDistribution().slice(0, 4);
 
   return `
-    <section class="dashboard-fold grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      ${metricCard('Saldo disponível', currency.format(position.availableBalance), 'Disponível agora', position.availableBalance >= 0 ? 'emerald' : 'rose', 'card-enter')}
-      ${metricCard('Receitas', currency.format(monthly.income), 'Entradas do mês', 'emerald', 'card-enter card-enter-delay-1')}
-      ${metricCard('Despesas', currency.format(monthly.expense), 'Saídas do mês', 'rose', 'card-enter card-enter-delay-2')}
-      ${metricCard('Total Investido', currency.format(position.investedBalance), 'Acumulado de todos os períodos', 'violet', 'card-enter card-enter-delay-3')}
-    </section>
-
-    <section class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-2">
-      ${metricCard('Aportado este mês', currency.format(monthly.investment), 'Entradas do mês atual', 'violet', 'card-enter card-enter-delay-4')}
+    <section class="dashboard-hero-grid dashboard-fold">
+      ${balanceCard(position, monthly)}
+      <div class="dashboard-metric-stack">
+        ${metricCard('Patrimônio total', currency.format(position.netWorth), 'Saldo livre + cofrinhos/investimentos', position.netWorth >= 0 ? 'emerald' : 'rose', 'card-enter card-enter-delay-1')}
+        ${metricCard('Cofrinhos/investimentos', currency.format(position.investedBalance), 'Separado do dinheiro do dia a dia', 'violet', 'card-enter card-enter-delay-2')}
+        ${metricCard('Variação/rendimento', currency.format(position.investmentVariation), 'Rendimentos menos perdas totais', position.investmentVariation >= 0 ? 'emerald' : 'rose', 'card-enter card-enter-delay-3')}
+      </div>
     </section>
 
     <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.45fr_.95fr]">
-      <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-        ${dashboardSectionHeader('Fluxo financeiro', 'Últimos 6 meses', '#/transactions', 'Ver transações')}
-        <div class="chart-frame mt-6">
-          <canvas id="dashboardFlowChart"></canvas>
-        </div>
-      </article>
+      ${chartCard('Evolução financeira', 'Patrimônio, saldo disponível e cofrinhos nos últimos 6 meses.', 'dashboardFlowChart', '#/reports', 'Explorar')}
 
       <div class="grid grid-cols-1 gap-4">
-        ${infoCard('Poupança', `${monthly.savingsRate.toFixed(1)}%`, `Você poupou ${monthly.savingsRate.toFixed(1)}% da receita este mês.`, 'emerald')}
-        ${infoCard('Saldo líquido', currency.format(monthly.netCashFlow), 'Receitas menos despesas e investimentos.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
-        ${infoCard('Patrimônio', currency.format(position.netWorth), `Patrimônio atual: ${currency.format(position.netWorth)}.`, 'violet')}
-        ${infoCard('Próximos vencimentos', `${dueSoon.length}`, dueSoon.length ? `${currency.format(sumAmount(dueSoon))} previstos em 7 dias.` : 'Nenhuma conta vence nos próximos 7 dias.', dueSoon.length ? 'rose' : 'emerald')}
-        ${infoCard('Assinaturas', currency.format(pendingTotal), pendingSubscriptions.length ? `${pendingSubscriptions.length} pendente(s) no período.` : 'Recorrências em dia.', pendingTotal ? 'rose' : 'emerald')}
-        <article class="glass rounded-[28px] p-5 hover-lift">
+        ${infoCard('Receitas do mês', currency.format(monthly.income), 'Entradas comuns no período atual.', 'emerald')}
+        ${infoCard('Despesas do mês', currency.format(monthly.expense), 'Saídas comuns do mês.', 'rose')}
+        ${infoCard('Saldo líquido', currency.format(monthly.netCashFlow), 'Receitas - despesas - aportes + resgates.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
+        ${infoCard('Poupança', `${monthly.savingsRate.toFixed(1)}%`, 'Taxa mensal considerando receitas e despesas.', 'violet')}
+        <article class="glass app-card p-5 hover-lift">
           <div class="flex items-center justify-between gap-3">
             <div>
               <h3 class="text-lg font-semibold tracking-tight">Orçamentos</h3>
@@ -797,14 +833,17 @@ function renderDashboardPage() {
       </div>
     </section>
 
-    <section class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-      ${dashboardAccountSummary('Saldo em contas', currency.format(accountSummary.includedBalance), 'Contas no saldo total', getTopAccountForDashboard(), 'accounts')}
-      ${dashboardAccountSummary('Gasto em cartões', currency.format(accountSummary.creditCardSpending), 'Fatura estimada do mês', getTopCreditCardForDashboard(), 'credit')}
-      ${dashboardAccountSummary('Método mais usado', accountSummary.topMethod?.label || 'Sem dados', accountSummary.topMethod ? currency.format(accountSummary.topMethod.amount) : 'N/A', accountSummary.topMethod, 'method')}
-      ${dashboardAccountSummary('Contas ativas', `${accountSummary.activeAccounts}`, 'Disponíveis para transações', null, 'active')}
+    <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[.9fr_1.1fr]">
+      ${chartCard('Distribuição dos cofrinhos', 'Participação de cada reserva/investimento no patrimônio separado.', 'dashboardAllocationChart', '#/investments', 'Gerenciar')}
+      <article class="glass app-card p-5 sm:p-6 hover-lift">
+        ${dashboardSectionHeader('Cofrinhos em destaque', 'Reservas integradas ao saldo total', '#/investments', 'Movimentar')}
+        <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          ${topInvestments.length ? topInvestments.map(renderVaultSummaryCard).join('') : emptyState('Crie seu primeiro cofrinho/investimento para separar dinheiro do saldo livre.')}
+        </div>
+      </article>
     </section>
 
-    <section class="mt-6 glass rounded-[30px] p-5 sm:p-6 hover-lift">
+    <section class="mt-6 glass app-card p-5 sm:p-6 hover-lift">
       ${dashboardSectionHeader('Insights', 'Leituras rápidas do mês', '#/reports', 'Ver relatórios')}
       <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         ${insights.map(renderInsightCard).join('')}
@@ -812,27 +851,77 @@ function renderDashboardPage() {
     </section>
 
     <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_.9fr]">
-      <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
+      <article class="glass app-card p-5 sm:p-6 hover-lift">
         ${dashboardSectionHeader('Últimas movimentações', 'Atividade recente', '#/transactions', 'Adicionar nova')}
         <div class="mt-5 space-y-3">
           ${recent.length ? recent.map(renderTransactionListItem).join('') : emptyState('Ainda não existem movimentações.')}
         </div>
       </article>
 
-      <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-        ${dashboardSectionHeader('Prioridades', 'Atalhos importantes')}
+      <article class="glass app-card p-5 sm:p-6 hover-lift">
+        ${dashboardSectionHeader('Próximas ações', 'Atalhos importantes')}
         <div class="mt-5 grid gap-4">
-          ${priorityCard('Meta principal', `${state.goal.name}`, `${getGoalProgress().progress.toFixed(0)}% concluído`, '#/goals')}
-          ${priorityCard('Planejamento', `Crescimento em foco`, `Patrimônio projetado: ${currency.format(compoundProjection().futureValue)}`, '#/calculator')}
-          ${priorityCard('Orçamentos', `${budgetStatus.overCount} categoria(s) acima do limite`, 'Ajuste categorias com maior pressão.', '#/budgets')}
-          ${priorityCard('Backup local', 'Exportar ou importar seus dados', 'Proteja seu histórico em JSON.', '#/backup')}
+          ${priorityCard('Adicionar transação', 'Registrar receita ou despesa', 'Atualiza saldo disponível e relatórios.', '#/transactions')}
+          ${priorityCard('Transferir para cofrinho', currency.format(monthly.investmentDeposit), 'Aportes feitos neste mês.', '#/investments')}
+          ${priorityCard('Resgatar de cofrinho', currency.format(monthly.investmentWithdrawal), 'Valor devolvido ao saldo livre.', '#/investments')}
+          ${priorityCard('Próximos vencimentos', dueSoon.length ? `${currency.format(sumAmount(dueSoon))}` : 'Sem alertas', dueSoon.length ? `${dueSoon.length} item(ns) em 7 dias.` : 'Nenhuma conta vence nos próximos 7 dias.', '#/calendar')}
+          ${priorityCard('Assinaturas', currency.format(pendingTotal), pendingSubscriptions.length ? `${pendingSubscriptions.length} pendente(s) no período.` : 'Recorrências em dia.', '#/subscriptions')}
         </div>
       </article>
     </section>
+  `;
+}
 
-    <section class="mt-6">
-      ${renderDashboardWeekCalendar()}
-    </section>
+function balanceCard(position, monthly) {
+  const balanceTone = position.availableBalance >= 0 ? 'tag-emerald' : 'tag-rose';
+  return `
+    <article class="balance-card card-enter">
+      <div class="relative z-10 flex h-full flex-col">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-sm text-slate-400">Saldo disponível</p>
+            <h2 class="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">${currency.format(position.availableBalance)}</h2>
+            <p class="mt-3 max-w-xl text-sm leading-relaxed text-slate-400">Dinheiro livre para usar hoje, já separado dos cofrinhos e investimentos.</p>
+          </div>
+          <span class="tag ${balanceTone}">${position.availableBalance >= 0 ? 'Saudável' : 'Atenção'}</span>
+        </div>
+        <div class="mt-auto grid grid-cols-1 gap-3 pt-8 sm:grid-cols-3">
+          <span class="balance-mini-metric"><small>Receitas</small><strong>${currency.format(monthly.income)}</strong></span>
+          <span class="balance-mini-metric"><small>Despesas</small><strong>${currency.format(monthly.expense)}</strong></span>
+          <span class="balance-mini-metric"><small>Aportes</small><strong>${currency.format(monthly.investmentDeposit)}</strong></span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function chartCard(title, subtitle, canvasId, href = '', actionLabel = '') {
+  return `
+    <article class="glass app-card chart-card p-5 sm:p-6 hover-lift">
+      ${dashboardSectionHeader(title, subtitle, href, actionLabel)}
+      <div class="chart-frame mt-6">
+        <canvas id="${canvasId}"></canvas>
+      </div>
+    </article>
+  `;
+}
+
+function renderVaultSummaryCard(item) {
+  const percent = item.total > 0 ? (item.amount / item.total) * 100 : 0;
+  return `
+    <article class="vault-summary-card" style="--vault-color:${escapeHtml(item.color || designColors.accent)}">
+      <div class="flex min-w-0 items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="truncate font-semibold text-slate-50">${escapeHtml(item.label)}</h3>
+          <p class="mt-1 truncate text-sm text-slate-400">${escapeHtml(item.detail || 'Cofrinho/investimento')}</p>
+        </div>
+        <span class="tag tag-violet">${percent.toFixed(0)}%</span>
+      </div>
+      <p class="mt-4 text-xl font-semibold tracking-tight">${currency.format(item.amount)}</p>
+      <div class="progress-track mt-4 h-2">
+        <div class="progress-bar" style="width:${Math.min(100, percent)}%; background:var(--vault-color)"></div>
+      </div>
+    </article>
   `;
 }
 
@@ -987,6 +1076,8 @@ function renderDashboardWeekDay(day) {
 function renderTransactionsPage() {
   const categories = getAvailableCategories();
   const editingTransaction = state.transactions.find((tx) => tx.id === valueOf('editingTransactionId', '')) || null;
+  const isTransactionFormOpen = Boolean(editingTransaction) || valueOf('transactionFormOpen', '') === 'true';
+  const selectedTransactionType = editingTransaction?.type === 'investment' ? 'investment_deposit' : editingTransaction?.type || 'expense';
   const selectedCategory = editingTransaction?.category || valueOf('draftTransactionCategory', categories[0] || 'Outros');
   const isCustomCategory = selectedCategory === '__custom__';
   const transactions = filterTransactions({
@@ -1006,19 +1097,20 @@ function renderTransactionsPage() {
       <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
         ${metricCard('Receitas filtradas', currency.format(monthly.income), 'Entradas no mês selecionado.', 'emerald')}
         ${metricCard('Despesas filtradas', currency.format(monthly.expense), 'Saídas consumidas no mês.', 'rose')}
-        ${metricCard('Investimentos', currency.format(monthly.investment), 'Aportes registrados.', 'violet')}
-        ${metricCard('Saldo líquido', currency.format(monthly.netCashFlow), 'Receitas - despesas - aportes.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
+        ${metricCard('Aportes', currency.format(monthly.investmentDeposit), 'Transferências para cofrinhos.', 'violet')}
+        ${metricCard('Saldo líquido', currency.format(monthly.netCashFlow), 'Receitas - despesas - aportes + resgates.', monthly.netCashFlow >= 0 ? 'emerald' : 'rose')}
       </div>
 
-      <section class="grid grid-cols-1 gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
-        <article class="glass rounded-[28px] p-5 sm:p-6">
+      <section class="grid grid-cols-1 gap-6">
+        <div class="form-modal ${isTransactionFormOpen ? 'open' : ''}" role="dialog" aria-modal="true" aria-labelledby="transactionFormTitle">
+        <article class="form-sheet glass p-5 sm:p-6">
           <div class="flex items-start gap-3">
             <span class="feature-icon feature-icon-violet">${icon(editingTransaction ? 'pencil' : 'plus', 'h-5 w-5')}</span>
             <div>
               <p class="text-xs uppercase tracking-[0.24em] text-slate-400">${editingTransaction ? 'Editar movimentação' : 'Nova movimentação'}</p>
-              <h2 class="mt-2 text-xl font-semibold tracking-tight">${editingTransaction ? 'Alterar transação' : 'Adicionar transação'}</h2>
+              <h2 id="transactionFormTitle" class="mt-2 text-xl font-semibold tracking-tight">${editingTransaction ? 'Alterar transação' : 'Adicionar transação'}</h2>
             </div>
-            ${editingTransaction ? `<button class="btn-secondary ml-auto h-10 w-10 p-0" data-cancel-transaction-edit aria-label="Cancelar edição">${icon('x', 'h-4 w-4')}</button>` : ''}
+            <button class="btn-secondary ml-auto h-10 w-10 p-0" data-close-form="transaction" aria-label="Fechar formulário">${icon('x', 'h-4 w-4')}</button>
           </div>
 
           <form id="transactionForm" class="mt-6 space-y-4" data-editing-transaction-id="${editingTransaction?.id || ''}">
@@ -1048,8 +1140,11 @@ function renderTransactionsPage() {
                     ${selectOptions([
                       ['income', 'Receita'],
                       ['expense', 'Despesa'],
-                      ['investment', 'Investimento']
-                    ], editingTransaction?.type || 'expense')}
+                      ['investment_deposit', 'Aporte em cofrinho'],
+                      ['investment_withdrawal', 'Resgate de cofrinho'],
+                      ['investment_gain', 'Rendimento'],
+                      ['investment_loss', 'Perda/variação negativa']
+                    ], selectedTransactionType)}
                   </select>
                 </div>
               </div>
@@ -1087,6 +1182,15 @@ function renderTransactionsPage() {
               </div>
             </div>
 
+            <div>
+              <label class="mb-2 block text-sm text-slate-300">Cofrinho/investimento</label>
+              <div class="select-wrap">
+                <select class="select-luxury" name="investmentAccountId">
+                  ${renderInvestmentAccountOptions(editingTransaction?.investmentAccountId || '', true)}
+                </select>
+              </div>
+            </div>
+
             <label class="inline-flex items-center gap-3 text-sm text-slate-300">
               <input name="recurring" type="checkbox" class="h-4 w-4 rounded border-white/20 bg-slate-900/60" ${editingTransaction?.recurring ? 'checked' : ''} />
               Marcar como recorrente
@@ -1095,6 +1199,7 @@ function renderTransactionsPage() {
             <button class="btn-primary w-full" type="submit">${icon('save', 'h-4 w-4')} ${editingTransaction ? 'Salvar alterações' : 'Salvar transação'}</button>
           </form>
         </article>
+        </div>
 
         <article class="glass rounded-[28px] p-5 sm:p-6 min-w-0">
           <div class="flex flex-col gap-4">
@@ -1103,7 +1208,10 @@ function renderTransactionsPage() {
                 <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Gestão inteligente</p>
                 <h2 class="mt-2 text-xl font-semibold tracking-tight">Lista de transações</h2>
               </div>
-              <button id="exportTransactionsCsvBtn" class="btn-secondary w-full sm:w-auto" type="button">${icon('download', 'h-4 w-4')} Exportar CSV</button>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <button class="btn-primary w-full sm:w-auto" type="button" data-open-form="transaction">${icon('plus', 'h-4 w-4')} Nova transação</button>
+                <button id="exportTransactionsCsvBtn" class="btn-secondary w-full sm:w-auto" type="button">${icon('download', 'h-4 w-4')} Exportar CSV</button>
+              </div>
             </div>
 
             <div class="transaction-toolbar">
@@ -1117,7 +1225,7 @@ function renderTransactionsPage() {
                     ['all', 'Todos os tipos'],
                     ['income', 'Receitas'],
                     ['expense', 'Despesas'],
-                    ['investment', 'Investimentos']
+                    ['investment', 'Investimentos/cofrinhos']
                   ], valueOf('filterType', 'all'))}
                 </select>
               </div>
@@ -1194,6 +1302,7 @@ function renderAccountsPage() {
     search: valueOf('searchAccount', '')
   });
   const editingAccount = state.financialAccounts.find((account) => account.id === valueOf('editingAccountId', '')) || null;
+  const isAccountFormOpen = Boolean(editingAccount) || valueOf('accountFormOpen', '') === 'true';
   const selectedPreset = quickAccountPresets.find((preset) => preset.label === valueOf('selectedAccountPreset', '')) || null;
   const draft = editingAccount || buildAccountDraftFromPreset(selectedPreset);
   const summary = getPaymentSourceSummary();
@@ -1207,17 +1316,18 @@ function renderAccountsPage() {
         ${metricCard('Banco mais movimentado', summary.topInstitution?.label || 'Sem dados', summary.topInstitution ? currency.format(summary.topInstitution.amount) : 'N/A', 'violet')}
       </div>
 
-      <section class="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <article class="glass rounded-[28px] p-5 sm:p-6">
+      <section class="grid grid-cols-1 gap-6">
+        <div class="form-modal ${isAccountFormOpen ? 'open' : ''}" role="dialog" aria-modal="true" aria-labelledby="accountFormTitle">
+        <article class="form-sheet glass p-5 sm:p-6">
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-start gap-3">
               <span class="feature-icon feature-icon-violet">${icon(editingAccount ? 'pencil' : 'plus', 'h-5 w-5')}</span>
               <div>
                 <p class="text-xs uppercase tracking-[0.24em] text-slate-400">${editingAccount ? 'Editar origem' : 'Novo modelo'}</p>
-                <h2 class="mt-2 text-xl font-semibold tracking-tight">${editingAccount ? 'Ajustar conta/cartão' : 'Adicionar conta/cartão'}</h2>
+                <h2 id="accountFormTitle" class="mt-2 text-xl font-semibold tracking-tight">${editingAccount ? 'Ajustar conta/cartão' : 'Adicionar conta/cartão'}</h2>
               </div>
             </div>
-            ${editingAccount ? `<button class="btn-secondary h-10 w-10 p-0" data-cancel-account-edit aria-label="Cancelar edição">${icon('x', 'h-4 w-4')}</button>` : ''}
+            <button class="btn-secondary h-10 w-10 p-0" data-close-form="account" aria-label="Fechar formulário">${icon('x', 'h-4 w-4')}</button>
           </div>
 
           <div class="mt-5">
@@ -1328,6 +1438,7 @@ function renderAccountsPage() {
             <button class="btn-primary w-full" type="submit">${icon('save', 'h-4 w-4')} ${editingAccount ? 'Salvar alterações' : 'Adicionar conta/cartão'}</button>
           </form>
         </article>
+        </div>
 
         <article class="glass rounded-[28px] p-5 sm:p-6 min-w-0">
           <div class="flex flex-col gap-4">
@@ -1335,6 +1446,7 @@ function renderAccountsPage() {
               <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Origem financeira</p>
               <h2 class="mt-2 text-xl font-semibold tracking-tight">Contas, cartões e carteiras</h2>
             </div>
+            <button class="btn-primary w-full sm:w-auto" type="button" data-open-form="account">${icon('plus', 'h-4 w-4')} Adicionar conta</button>
             <div class="transaction-toolbar">
               <div class="toolbar-search">${icon('search', 'h-4 w-4')}<input id="searchAccount" value="${escapeHtml(valueOf('searchAccount', ''))}" placeholder="Buscar nome, banco ou apelido..." /></div>
               <div class="select-wrap"><select id="filterAccountType" class="select-luxury">${selectOptions([['all', 'Todos os tipos'], ...accountTypeOptions], valueOf('filterAccountType', 'all'))}</select></div>
@@ -1354,11 +1466,11 @@ function renderAccountsPage() {
 
 function renderInvestmentsPage() {
   const investmentAccounts = state.investmentAccounts || [];
-  const totalInvested = sumAmount(investmentAccounts.map((acc) => acc.currentTotal));
+  const editingInvestment = investmentAccounts.find((account) => account.id === valueOf('editingInvestmentAccountId', '')) || null;
+  const isInvestmentFormOpen = valueOf('investmentFormOpen', '') === 'true' || Boolean(editingInvestment);
+  const totalInvested = finance.computeInvestedBalance(state.transactions, investmentAccounts);
   const activeInvestments = investmentAccounts.filter((acc) => acc.isActive).length;
-  const investmentTransactions = (state.transactions || []).filter((tx) => tx.type === 'investment');
-  const monthTransactions = getMonthlyTransactions(new Date()).filter((tx) => tx.type === 'investment');
-  const monthInvested = sumAmount(monthTransactions);
+  const monthSummary = getMonthlySummary(new Date());
 
   const investmentTypeColors = {
     stock: 'tag-violet',
@@ -1371,12 +1483,17 @@ function renderInvestmentsPage() {
   };
 
   return `
-    <section class="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-      <article class="glass rounded-[28px] p-5 sm:p-6">
-        <form id="investmentAccountForm" data-editing-account-id="" class="space-y-4">
-          <div>
+    <section class="grid grid-cols-1 gap-6">
+      <div class="form-modal ${isInvestmentFormOpen ? 'open' : ''}" role="dialog" aria-modal="true" aria-labelledby="investmentFormTitle">
+      <article class="form-sheet glass p-5 sm:p-6">
+        <form id="investmentAccountForm" data-editing-account-id="${editingInvestment?.id || ''}" class="space-y-4">
+          <div class="flex items-start gap-3">
             <span class="feature-icon feature-icon-violet">${icon('landmark', 'h-5 w-5')}</span>
-            <h2 class="mt-3 text-xl font-semibold tracking-tight">Adicionar investimento</h2>
+            <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Reserva ou investimento</p>
+              <h2 id="investmentFormTitle" class="mt-2 text-xl font-semibold tracking-tight">${editingInvestment ? 'Editar cofrinho' : 'Adicionar cofrinho'}</h2>
+            </div>
+            <button class="btn-secondary ml-auto h-10 w-10 p-0" data-close-form="investment" type="button" aria-label="Fechar formulário">${icon('x', 'h-4 w-4')}</button>
           </div>
 
           <div>
@@ -1384,7 +1501,7 @@ function renderInvestmentsPage() {
             <select class="input-luxury" name="investmentInstitution" required>
               <option value="">Selecione uma instituição</option>
               ${(state.financialInstitutions || []).map((inst) => `
-                <option value="${escapeHtml(inst.id)}" data-logo="${escapeHtml(inst.logoPath)}" data-icon="${escapeHtml(inst.icon)}" data-color="${escapeHtml(inst.brandColor)}">
+                <option value="${escapeHtml(inst.id)}" ${editingInvestment?.institutionId === inst.id ? 'selected' : ''} data-logo="${escapeHtml(inst.logoPath)}" data-icon="${escapeHtml(inst.icon)}" data-color="${escapeHtml(inst.brandColor)}">
                   ${escapeHtml(inst.name)}
                 </option>
               `).join('')}
@@ -1392,72 +1509,141 @@ function renderInvestmentsPage() {
           </div>
 
           <div>
-            <label class="mb-2 block text-sm text-slate-300">Apelido da conta</label>
-            <input class="input-luxury" name="investmentNickname" placeholder="Ex.: Ações Tech" />
+            <label class="mb-2 block text-sm text-slate-300">Nome do cofrinho</label>
+            <input class="input-luxury" name="investmentNickname" value="${escapeHtml(editingInvestment?.nickname || '')}" placeholder="Ex.: Reserva de emergência" />
           </div>
 
           <div>
             <label class="mb-2 block text-sm text-slate-300">Tipo de investimento</label>
             <select class="input-luxury" name="investmentType" required>
-              <option value="stock">Ações</option>
-              <option value="crypto">Criptomoedas</option>
-              <option value="reits">Fundos imobiliários</option>
-              <option value="fixed_income">Renda fixa</option>
-              <option value="fund">Fundos</option>
-              <option value="pension">Previdência</option>
-              <option value="other">Outro</option>
+              ${selectOptions([
+                ['stock', 'Ações'],
+                ['crypto', 'Criptomoedas'],
+                ['reits', 'Fundos imobiliários'],
+                ['fixed_income', 'Renda fixa'],
+                ['fund', 'Fundos'],
+                ['pension', 'Previdência'],
+                ['other', 'Outro']
+              ], editingInvestment?.investmentType || 'fixed_income')}
             </select>
           </div>
 
           <div>
             <label class="mb-2 block text-sm text-slate-300">Número da conta (opcional)</label>
-            <input class="input-luxury" name="investmentAccountNumber" placeholder="Ex.: 123456" />
+            <input class="input-luxury" name="investmentAccountNumber" value="${escapeHtml(editingInvestment?.accountNumber || '')}" placeholder="Ex.: 123456" />
           </div>
 
           <div>
-            <label class="mb-2 block text-sm text-slate-300">Capital inicial investido</label>
+            <label class="mb-2 block text-sm text-slate-300">Saldo inicial já existente</label>
             <div class="money-input-wrap">
               <span>R$</span>
-              <input class="input-luxury money-input" name="investmentInitial" inputmode="decimal" placeholder="0,00" />
+              <input class="input-luxury money-input" name="investmentInitial" value="${editingInvestment ? formatMoneyInput(editingInvestment.initialInvestment || 0) : ''}" inputmode="decimal" placeholder="0,00" />
             </div>
           </div>
 
           <div>
             <label class="mb-2 block text-sm text-slate-300">Perfil de risco</label>
             <select class="input-luxury" name="investmentRiskProfile">
-              <option value="conservative">Conservador</option>
-              <option value="moderate" selected>Moderado</option>
-              <option value="aggressive">Agressivo</option>
-              <option value="balanced">Balanceado</option>
+              ${selectOptions([
+                ['conservative', 'Conservador'],
+                ['moderate', 'Moderado'],
+                ['aggressive', 'Agressivo'],
+                ['balanced', 'Balanceado']
+              ], editingInvestment?.riskProfile || 'balanced')}
             </select>
           </div>
 
           <div>
             <label class="mb-2 block text-sm text-slate-300">Notas</label>
-            <textarea class="input-luxury" name="investmentNotes" placeholder="Observações..." rows="2"></textarea>
+            <textarea class="input-luxury" name="investmentNotes" placeholder="Observações..." rows="2">${escapeHtml(editingInvestment?.notes || '')}</textarea>
           </div>
 
           <div class="flex gap-2">
-            <button class="btn-primary flex-1" type="submit">${icon('plus', 'h-4 w-4')} Adicionar</button>
+            <button class="btn-primary flex-1" type="submit">${icon('plus', 'h-4 w-4')} ${editingInvestment ? 'Salvar cofrinho' : 'Adicionar'}</button>
             <button class="btn-secondary" id="cancelInvestmentEdit" type="button" style="display:none;">${icon('x', 'h-4 w-4')}</button>
           </div>
         </form>
       </article>
+      </div>
 
       <div class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          ${metricCard('Total Investido', currency.format(totalInvested), 'Valor acumulado', 'violet', '')}
-          ${metricCard('Contas ativas', `${activeInvestments}`, 'Contas de investimento', 'violet', '')}
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Cofrinhos e investimentos</p>
+            <h2 class="text-2xl font-semibold tracking-tight">Reservas separadas do saldo livre</h2>
+          </div>
+          <button class="btn-primary w-full sm:w-auto" type="button" data-open-form="investment">${icon('plus', 'h-4 w-4')} Criar cofrinho</button>
         </div>
 
-        <article class="glass rounded-[28px] p-5 sm:p-6">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          ${metricCard('Reservado/investido', currency.format(totalInvested), 'Valor separado do saldo livre', 'violet', '')}
+          ${metricCard('Variação do mês', currency.format(monthSummary.investmentVariation), 'Rendimentos menos perdas', monthSummary.investmentVariation >= 0 ? 'emerald' : 'rose', '')}
+          ${metricCard('Aportes do mês', currency.format(monthSummary.investmentDeposit), 'Saiu do saldo principal', 'violet', '')}
+          ${metricCard('Resgates do mês', currency.format(monthSummary.investmentWithdrawal), 'Voltou ao saldo principal', 'emerald', '')}
+          ${metricCard('Cofrinhos ativos', `${activeInvestments}`, 'Locais separados do saldo', 'violet', '')}
+        </div>
+
+        ${chartCard('Alocação dos cofrinhos', 'Distribuição do valor reservado por cofrinho ou investimento.', 'investmentAllocationChart', '#/reports', 'Ver relatório')}
+
+        <article class="glass app-card p-5 sm:p-6">
+          <div class="mb-4">
+            <h3 class="text-lg font-semibold tracking-tight">Movimentar cofrinho</h3>
+            <p class="mt-1 text-sm text-slate-400">Registre aportes, resgates, rendimentos e perdas sem misturar com o saldo livre.</p>
+          </div>
+          <form id="investmentMovementForm" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div class="xl:col-span-2">
+              <label class="mb-2 block text-sm text-slate-300">Cofrinho/investimento</label>
+              <select class="input-luxury" name="investmentAccountId" required>
+                ${renderInvestmentAccountOptions('', false)}
+              </select>
+            </div>
+            <div>
+              <label class="mb-2 block text-sm text-slate-300">Operação</label>
+              <select class="input-luxury" name="movementType">
+                ${selectOptions([
+                  ['investment_deposit', 'Aportar'],
+                  ['investment_withdrawal', 'Resgatar'],
+                  ['investment_gain', 'Rendimento'],
+                  ['investment_loss', 'Perda']
+                ], 'investment_deposit')}
+              </select>
+            </div>
+            <div>
+              <label class="mb-2 block text-sm text-slate-300">Valor</label>
+              <div class="money-input-wrap">
+                <span>R$</span>
+                <input class="input-luxury money-input" name="amount" inputmode="decimal" required placeholder="0,00" />
+              </div>
+            </div>
+            <div>
+              <label class="mb-2 block text-sm text-slate-300">Data</label>
+              <input class="input-luxury" name="date" type="date" value="${localISO(new Date())}" required />
+            </div>
+            <div class="md:col-span-2 xl:col-span-2">
+              <label class="mb-2 block text-sm text-slate-300">Conta principal</label>
+              <select class="input-luxury" name="financialAccountId">
+                ${renderFinancialAccountOptions('', true)}
+              </select>
+            </div>
+            <div class="md:col-span-2 xl:col-span-3">
+              <label class="mb-2 block text-sm text-slate-300">Descrição</label>
+              <input class="input-luxury" name="description" placeholder="Ex.: Aporte na reserva" />
+            </div>
+            <button class="btn-primary md:col-span-2 xl:col-span-5" type="submit">${icon('arrow-right-left', 'h-4 w-4')} Registrar movimentação</button>
+          </form>
+        </article>
+
+        <article class="glass app-card p-5 sm:p-6">
           <div class="flex items-center justify-between gap-3 mb-4">
-            <h3 class="text-lg font-semibold tracking-tight">Suas contas</h3>
-            <input type="text" class="w-48 rounded-lg border border-slate-600 bg-slate-900/50 px-3 py-1 text-sm text-slate-100 placeholder-slate-500" id="searchInvestmentAccount" placeholder="Buscar..." />
+            <div>
+              <h3 class="text-lg font-semibold tracking-tight">Seus cofrinhos</h3>
+              <p class="mt-1 text-sm text-slate-400">Cards com saldo, risco, aportes e variação mensal.</p>
+            </div>
+            <input type="text" class="input-luxury max-w-56" id="searchInvestmentAccount" placeholder="Buscar..." />
           </div>
 
-          <div id="investmentAccountsList" class="space-y-3">
-            ${investmentAccounts.length ? investmentAccounts.map((acc) => renderInvestmentAccountCard(acc, investmentTypeColors)).join('') : emptyState('Nenhuma conta de investimento cadastrada.')}
+          <div id="investmentAccountsList" class="grid grid-cols-1 gap-3 2xl:grid-cols-2">
+            ${investmentAccounts.length ? investmentAccounts.map((acc) => renderInvestmentAccountCard(acc, investmentTypeColors)).join('') : emptyState('Nenhum cofrinho/investimento cadastrado.')}
           </div>
         </article>
       </div>
@@ -1477,43 +1663,57 @@ function renderInvestmentAccountCard(acc, typeColors = {}) {
   };
 
   const institution = (state.financialInstitutions || []).find((i) => i.id === acc.institutionId);
-  const investmentMonth = (state.transactions || [])
-    .filter((tx) => tx.type === 'investment' && tx.investmentAccountId === acc.id && tx.date.slice(0, 7) === currentPeriodKey())
-    .reduce((sum, tx) => sum + tx.amount, 0);
+  const balance = finance.computeInvestmentAccountBalance(acc, state.transactions);
+  const monthTransactions = (state.transactions || [])
+    .filter((tx) => isInvestmentTransactionType(tx.type) && tx.investmentAccountId === acc.id && tx.date.slice(0, 7) === currentPeriodKey());
+  const investmentMonth = monthTransactions
+    .filter((tx) => tx.type === 'investment' || tx.type === 'investment_deposit')
+    .reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const variationMonth = monthTransactions.reduce((sum, tx) => {
+    if (tx.type === 'investment_gain') return finance.addMoney(sum, tx.amount);
+    if (tx.type === 'investment_loss') return finance.subtractMoney(sum, tx.amount);
+    return sum;
+  }, 0);
 
   return `
-    <article class="rounded-[20px] border ${acc.isActive ? 'border-violet-500/30 bg-violet-500/5' : 'border-slate-600/50 bg-slate-900/30'} p-4 transition hover:border-violet-500/50">
-      <div class="flex items-start justify-between gap-3 mb-3">
-        <div class="flex-1">
-          <h4 class="font-semibold text-slate-100">${escapeHtml(acc.nickname || acc.name)}</h4>
-          <p class="text-sm text-slate-400">${institution?.name || 'Instituição desconhecida'}</p>
+    <article class="investment-card" style="${institutionStyleVars(institution)}">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0 flex items-center gap-3">
+          ${institutionAvatar(institution, 'h-11 w-11')}
+          <div class="min-w-0">
+            <h4 class="truncate font-semibold text-slate-100">${escapeHtml(acc.nickname || acc.name)}</h4>
+            <p class="truncate text-sm text-slate-400">${institution?.name || 'Instituição desconhecida'}</p>
+          </div>
         </div>
-        <div class="flex gap-1">
-          <button class="icon-btn p-1.5" data-edit-investment="${escapeHtml(acc.id)}" title="Editar">${icon('pencil', 'h-4 w-4')}</button>
-          <button class="icon-btn p-1.5" data-delete-investment="${escapeHtml(acc.id)}" title="Deletar">${icon('trash-2', 'h-4 w-4')}</button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <span class="text-slate-400">Tipo</span>
-          <p class="font-mono text-slate-200">${typeLabels[acc.investmentType] || acc.investmentType}</p>
-        </div>
-        <div>
-          <span class="text-slate-400">Risco</span>
-          <p class="font-mono text-slate-200 capitalize">${acc.riskProfile}</p>
-        </div>
-        <div>
-          <span class="text-slate-400">Total</span>
-          <p class="font-mono font-semibold text-violet-300">${currency.format(acc.currentTotal)}</p>
-        </div>
-        <div>
-          <span class="text-slate-400">Este mês</span>
-          <p class="font-mono text-slate-200">${currency.format(investmentMonth)}</p>
+        <div class="flex shrink-0 gap-1">
+          <button class="icon-ghost h-10 w-10 p-0" data-edit-investment="${escapeHtml(acc.id)}" title="Editar">${icon('pencil', 'h-4 w-4')}</button>
+          <button class="icon-ghost h-10 w-10 p-0" data-delete-investment="${escapeHtml(acc.id)}" title="Deletar">${icon('trash-2', 'h-4 w-4')}</button>
         </div>
       </div>
 
-      ${acc.notes ? `<p class="mt-3 text-xs text-slate-500">${escapeHtml(acc.notes)}</p>` : ''}
+      <div class="mt-5 flex flex-wrap items-center gap-2">
+        <span class="tag ${typeColors[acc.investmentType] || 'tag-slate'}">${typeLabels[acc.investmentType] || acc.investmentType}</span>
+        <span class="tag ${acc.isActive ? 'tag-emerald' : 'tag-slate'}">${acc.isActive ? 'Ativo' : 'Inativo'}</span>
+        <span class="tag tag-slate">${escapeHtml(acc.riskProfile || 'balanced')}</span>
+      </div>
+
+      <div class="mt-5">
+        <p class="text-sm text-slate-400">Total reservado</p>
+        <p class="mt-1 text-3xl font-semibold tracking-tight text-slate-50">${currency.format(balance)}</p>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div class="mini-stat">
+          <span>Aportes mês</span>
+          <strong>${currency.format(investmentMonth)}</strong>
+        </div>
+        <div class="mini-stat">
+          <span>Variação mês</span>
+          <strong class="${variationMonth >= 0 ? 'text-emerald-300' : 'text-rose-300'}">${currency.format(variationMonth)}</strong>
+        </div>
+      </div>
+
+      ${acc.notes ? `<p class="mt-4 line-clamp-2 text-sm text-slate-500">${escapeHtml(acc.notes)}</p>` : ''}
     </article>
   `;
 }
@@ -2061,6 +2261,16 @@ function renderReportsPage() {
   const sourceSummary = getPaymentSourceSummary();
   return `
     <section class="grid grid-cols-1 gap-6">
+      <div class="report-filter-bar">
+        <div>
+          <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Relatórios</p>
+          <h2 class="mt-2 text-2xl font-semibold tracking-tight">Leitura financeira do período</h2>
+        </div>
+        <div class="period-tabs" role="list" aria-label="Período dos relatórios">
+          ${['Diário', 'Semanal', 'Mensal', 'Anual'].map((label, index) => `<span class="period-tab ${index === 2 ? 'active' : ''}">${label}</span>`).join('')}
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         ${metricCard('Maior categoria do mês', insights.topCategory.label, insights.topCategory.detail, 'rose')}
         ${metricCard('Despesa média diária', currency.format(insights.avgDailyExpense), 'Média aproximada no mês corrente.', 'emerald')}
@@ -2069,28 +2279,13 @@ function renderReportsPage() {
       </div>
 
       <section class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-          <div>
-            <h2 class="text-xl font-semibold tracking-tight">Despesas por categoria</h2>
-            <p class="mt-1 text-sm text-slate-400">Leitura visual do peso de cada categoria no mês atual.</p>
-          </div>
-          <div class="chart-frame mt-6">
-            <canvas id="reportCategoryChart"></canvas>
-          </div>
-        </article>
-
-        <article class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
-          <div>
-            <h2 class="text-xl font-semibold tracking-tight">Saldo mensal dos últimos 6 meses</h2>
-            <p class="mt-1 text-sm text-slate-400">Compara a geração líquida de caixa mês a mês.</p>
-          </div>
-          <div class="chart-frame mt-6">
-            <canvas id="reportBalanceChart"></canvas>
-          </div>
-        </article>
+        ${chartCard('Despesas por categoria', 'Leitura visual do peso de cada categoria no mês atual.', 'reportCategoryChart')}
+        ${chartCard('Saldo mensal', 'Compara a geração líquida de caixa mês a mês.', 'reportBalanceChart')}
+        ${chartCard('Receitas versus despesas', 'Entradas e saídas lado a lado nos últimos 6 meses.', 'reportIncomeExpenseChart')}
+        ${chartCard('Rendimento dos investimentos', 'Rendimento líquido mensal dos cofrinhos/investimentos.', 'reportInvestmentChart')}
       </section>
 
-      <section class="glass rounded-[30px] p-5 sm:p-6 hover-lift">
+      <section class="glass app-card p-5 sm:p-6 hover-lift">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 class="text-xl font-semibold tracking-tight">Contas, cartões e métodos</h2>
@@ -2208,6 +2403,7 @@ function renderBackupPage() {
 }
 
 function renderTransactionListItem(tx) {
+  const typeMeta = getTypeMeta(tx.type);
   return `
     <div class="rounded-[24px] border border-white/10 bg-white/5 p-4">
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -2221,7 +2417,7 @@ function renderTransactionListItem(tx) {
             ${compactOriginPill(tx)}
           </div>
         </div>
-        <div class="text-right font-semibold ${tx.type === 'income' ? 'text-emerald-300' : tx.type === 'investment' ? 'text-violet-300' : 'text-rose-300'}">${currency.format(tx.amount)}</div>
+        <div class="text-right font-semibold ${typeMeta.textClass}">${currency.format(tx.amount)}</div>
       </div>
     </div>
   `;
@@ -2365,10 +2561,30 @@ function getTypeMeta(type) {
   if (type === 'income') {
     return { label: 'Receita', icon: 'trending-up', tagClass: 'tag-emerald', textClass: 'text-emerald-300', iconClass: 'category-icon-emerald' };
   }
-  if (type === 'investment') {
-    return { label: 'Investimento', icon: 'landmark', tagClass: 'tag-violet', textClass: 'text-violet-300', iconClass: 'category-icon-violet' };
+  if (type === 'investment' || type === 'investment_deposit') {
+    return { label: 'Aporte', icon: 'arrow-up-right', tagClass: 'tag-violet', textClass: 'text-violet-300', iconClass: 'category-icon-violet' };
+  }
+  if (type === 'investment_withdrawal') {
+    return { label: 'Resgate', icon: 'arrow-down-left', tagClass: 'tag-emerald', textClass: 'text-emerald-300', iconClass: 'category-icon-emerald' };
+  }
+  if (type === 'investment_gain') {
+    return { label: 'Rendimento', icon: 'trending-up', tagClass: 'tag-emerald', textClass: 'text-emerald-300', iconClass: 'category-icon-emerald' };
+  }
+  if (type === 'investment_loss') {
+    return { label: 'Perda', icon: 'trending-down', tagClass: 'tag-rose', textClass: 'text-rose-300', iconClass: 'category-icon-rose' };
   }
   return { label: 'Despesa', icon: 'trending-down', tagClass: 'tag-rose', textClass: 'text-rose-300', iconClass: 'category-icon-rose' };
+}
+
+function isInvestmentTransactionType(type) {
+  return finance.INVESTMENT_TYPES?.has(type) || ['investment', 'investment_deposit', 'investment_withdrawal', 'investment_gain', 'investment_loss'].includes(type);
+}
+
+function getInvestmentMovementCategory(type) {
+  if (type === 'investment_withdrawal') return 'Resgate de investimento';
+  if (type === 'investment_gain') return 'Rendimento de investimento';
+  if (type === 'investment_loss') return 'Perda de investimento';
+  return 'Aporte em investimento';
 }
 
 function categoryBadge(category) {
@@ -2400,7 +2616,8 @@ function normalizeText(value) {
 
 function scheduleToneClass(tone) {
   if (tone === 'income') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100';
-  if (tone === 'investment') return 'border-violet-400/20 bg-violet-400/10 text-violet-100';
+  if (tone === 'investment' || tone === 'investment_deposit') return 'border-violet-400/20 bg-violet-400/10 text-violet-100';
+  if (tone === 'investment_withdrawal' || tone === 'investment_gain') return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100';
   if (tone === 'subscription-pending') return 'border-sky-400/20 bg-sky-400/10 text-sky-100';
   if (tone === 'subscription-overdue') return 'border-rose-400/30 bg-rose-400/10 text-rose-100';
   return 'border-rose-400/20 bg-rose-400/10 text-rose-100';
@@ -2463,6 +2680,7 @@ function bindLoginPage() {
 
 function bindShell() {
   bindToastDismiss();
+  bindFormModals();
   document.getElementById('openSidebarBtn')?.addEventListener('click', () => {
     ui.sidebarOpen = true;
     syncSidebar();
@@ -2484,6 +2702,62 @@ function bindShell() {
     });
   });
   document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+}
+
+function bindFormModals() {
+  document.querySelectorAll('[data-open-form]').forEach((button) => {
+    button.addEventListener('click', () => {
+      openEntryForm(button.dataset.openForm);
+    });
+  });
+
+  document.querySelectorAll('[data-close-form]').forEach((button) => {
+    button.addEventListener('click', () => {
+      closeEntryForm(button.dataset.closeForm);
+    });
+  });
+
+  document.querySelectorAll('.form-modal.open').forEach((modal) => {
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        const closeButton = modal.querySelector('[data-close-form]');
+        closeEntryForm(closeButton?.dataset.closeForm || '');
+      }
+    });
+  });
+}
+
+function openEntryForm(kind) {
+  if (kind === 'transaction') {
+    persistViewValue('editingTransactionId', '');
+    persistViewValue('transactionFormOpen', 'true');
+  }
+  if (kind === 'account') {
+    persistViewValue('editingAccountId', '');
+    persistViewValue('accountFormOpen', 'true');
+  }
+  if (kind === 'investment') {
+    persistViewValue('editingInvestmentAccountId', '');
+    persistViewValue('investmentFormOpen', 'true');
+  }
+  render();
+}
+
+function closeEntryForm(kind) {
+  if (kind === 'transaction') {
+    persistViewValue('transactionFormOpen', '');
+    persistViewValue('editingTransactionId', '');
+  }
+  if (kind === 'account') {
+    persistViewValue('accountFormOpen', '');
+    persistViewValue('editingAccountId', '');
+    persistViewValue('selectedAccountPreset', '');
+  }
+  if (kind === 'investment') {
+    persistViewValue('investmentFormOpen', '');
+    persistViewValue('editingInvestmentAccountId', '');
+  }
+  render();
 }
 
 function bindToastDismiss() {
@@ -2550,6 +2824,7 @@ function bindRoute(route) {
 
 function postRender(route) {
   if (route === 'dashboard') queueChartRender(renderDashboardChart);
+  if (route === 'investments') queueChartRender(renderInvestmentCharts);
   if (route === 'reports') queueChartRender(renderReportCharts);
 }
 
@@ -2643,8 +2918,14 @@ function bindTransactionsPage() {
       customCategory: data.get('customCategory')
     });
     const amount = readPositiveAmount(data.get('amount'));
+    const type = String(data.get('type') || 'expense');
+    const investmentAccountId = String(data.get('investmentAccountId') || '');
     if (!amount) {
       showToast('Informe um valor maior que zero.', 'error', 'Transação inválida');
+      return;
+    }
+    if (isInvestmentTransactionType(type) && !investmentAccountId) {
+      showToast('Escolha um cofrinho/investimento para esta movimentação.', 'error', 'Cofrinho obrigatório');
       return;
     }
 
@@ -2654,11 +2935,12 @@ function bindTransactionsPage() {
       description: String(data.get('description') || '').trim(),
       amount,
       date: String(data.get('date') || localISO(new Date())),
-      type: String(data.get('type') || 'expense'),
+      type,
       category,
       recurring: Boolean(data.get('recurring')),
       financialAccountId: String(data.get('financialAccountId') || ''),
-      paymentMethodId: String(data.get('paymentMethodId') || '')
+      paymentMethodId: String(data.get('paymentMethodId') || ''),
+      investmentAccountId
     };
 
     state.transactions = editingId
@@ -2667,6 +2949,7 @@ function bindTransactionsPage() {
 
     persistViewValue('draftTransactionCategory', category);
     persistViewValue('editingTransactionId', '');
+    persistViewValue('transactionFormOpen', '');
     saveState();
     render();
   });
@@ -2714,6 +2997,7 @@ function bindTransactionsPage() {
   document.querySelectorAll('[data-edit-transaction]').forEach((button) => {
     button.addEventListener('click', () => {
       persistViewValue('editingTransactionId', button.dataset.editTransaction);
+      persistViewValue('transactionFormOpen', 'true');
       render();
     });
   });
@@ -2800,6 +3084,7 @@ function bindAccountsPage() {
       : [nextAccount, ...state.financialAccounts];
 
     persistViewValue('editingAccountId', '');
+    persistViewValue('accountFormOpen', '');
     persistViewValue('selectedAccountPreset', '');
     saveState();
     render();
@@ -2808,6 +3093,7 @@ function bindAccountsPage() {
   document.querySelectorAll('[data-edit-account]').forEach((button) => {
     button.addEventListener('click', () => {
       persistViewValue('editingAccountId', button.dataset.editAccount);
+      persistViewValue('accountFormOpen', 'true');
       persistViewValue('selectedAccountPreset', '');
       render();
     });
@@ -2851,6 +3137,7 @@ function bindAccountsPage() {
 
 function bindInvestmentsPage() {
   const form = document.getElementById('investmentAccountForm');
+  const movementForm = document.getElementById('investmentMovementForm');
   const cancelBtn = document.getElementById('cancelInvestmentEdit');
   const searchInput = document.getElementById('searchInvestmentAccount');
 
@@ -2859,7 +3146,7 @@ function bindInvestmentsPage() {
       event.preventDefault();
       const data = new FormData(form);
       const editingId = form.dataset.editingAccountId;
-      const accountId = editingId || makeId('invacct');
+      const accountId = editingId || uid();
       const institutionId = String(data.get('investmentInstitution') || '');
       const nickname = String(data.get('investmentNickname') || '').trim();
       const type = String(data.get('investmentType') || 'other');
@@ -2904,16 +3191,56 @@ function bindInvestmentsPage() {
       form.dataset.editingAccountId = '';
       form.reset();
       if (cancelBtn) cancelBtn.style.display = 'none';
+      persistViewValue('investmentFormOpen', '');
+      persistViewValue('editingInvestmentAccountId', '');
       saveState();
       render();
     });
   }
+
+  movementForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const investmentAccountId = String(data.get('investmentAccountId') || '');
+    const type = String(data.get('movementType') || 'investment_deposit');
+    const amount = readPositiveAmount(data.get('amount'));
+    const account = getInvestmentAccountById(investmentAccountId);
+    if (!account) {
+      showToast('Escolha um cofrinho/investimento válido.', 'error', 'Cofrinho inválido');
+      return;
+    }
+    if (!amount) {
+      showToast('Informe um valor maior que zero.', 'error', 'Movimentação inválida');
+      return;
+    }
+
+    const typeMeta = getTypeMeta(type);
+    const description = String(data.get('description') || '').trim() || `${typeMeta.label} - ${account.nickname || account.name}`;
+    state.transactions = [{
+      id: uid(),
+      description,
+      amount,
+      date: String(data.get('date') || localISO(new Date())),
+      type,
+      category: getInvestmentMovementCategory(type),
+      recurring: false,
+      financialAccountId: String(data.get('financialAccountId') || ''),
+      paymentMethodId: '',
+      investmentAccountId
+    }, ...state.transactions];
+
+    saveState();
+    render();
+  });
 
   if (cancelBtn) {
     cancelBtn.addEventListener('click', () => {
       form.dataset.editingAccountId = '';
       form.reset();
       cancelBtn.style.display = 'none';
+      persistViewValue('investmentFormOpen', '');
+      persistViewValue('editingInvestmentAccountId', '');
+      render();
     });
   }
 
@@ -2923,17 +3250,9 @@ function bindInvestmentsPage() {
       const account = (state.investmentAccounts || []).find((a) => a.id === accountId);
       if (!account) return;
 
-      form.dataset.editingAccountId = accountId;
-      form.querySelector('[name="investmentInstitution"]').value = account.institutionId || '';
-      form.querySelector('[name="investmentNickname"]').value = account.nickname || '';
-      form.querySelector('[name="investmentType"]').value = account.investmentType || 'other';
-      form.querySelector('[name="investmentAccountNumber"]').value = account.accountNumber || '';
-      form.querySelector('[name="investmentInitial"]').value = formatMoney(account.initialInvestment || 0);
-      form.querySelector('[name="investmentRiskProfile"]').value = account.riskProfile || 'balanced';
-      form.querySelector('[name="investmentNotes"]').value = account.notes || '';
-
-      if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-      window.scrollTo(0, 0);
+      persistViewValue('investmentFormOpen', 'true');
+      persistViewValue('editingInvestmentAccountId', accountId);
+      render();
     });
   });
 
@@ -2941,6 +3260,11 @@ function bindInvestmentsPage() {
     btn.addEventListener('click', () => {
       const accountId = btn.dataset.deleteInvestment;
       if (!confirm('Tem certeza que deseja deletar esta conta de investimento?')) {
+        return;
+      }
+      const hasTransactions = state.transactions.some((tx) => tx.investmentAccountId === accountId);
+      if (hasTransactions) {
+        showToast('Este cofrinho já possui movimentações. Mantenha-o para preservar o histórico.', 'info', 'Histórico preservado');
         return;
       }
       state.investmentAccounts = (state.investmentAccounts || []).filter((a) => a.id !== accountId);
@@ -3296,7 +3620,7 @@ function getGoalProgress() {
 function getAverageMonthlyInvestment() {
   const grouped = {};
   state.transactions
-    .filter((tx) => tx.type === 'investment')
+    .filter((tx) => tx.type === 'investment' || tx.type === 'investment_deposit')
     .forEach((tx) => {
       const key = tx.date.slice(0, 7);
       grouped[key] = (grouped[key] || 0) + tx.amount;
@@ -3456,6 +3780,16 @@ function renderFinancialAccountOptions(selectedId = '', includeEmpty = false) {
 
 function renderFinancialAccountFilterOptions(selectedId = 'all') {
   return selectOptions([['all', 'Todas contas'], ...state.financialAccounts.map((account) => [account.id, account.nickname || account.name])], selectedId);
+}
+
+function renderInvestmentAccountOptions(selectedId = '', includeEmpty = false) {
+  const options = (state.investmentAccounts || [])
+    .filter((account) => account.isActive !== false)
+    .map((account) => {
+      const institution = getInstitutionById(account.institutionId);
+      return [account.id, `${institution?.shortName ? `${institution.shortName} · ` : ''}${account.nickname || account.name}`];
+    });
+  return selectOptions(includeEmpty ? [['', 'Sem cofrinho/investimento'], ...options] : options, selectedId);
 }
 
 function renderPaymentMethodOptions(selectedId = '', includeEmpty = false) {
@@ -3763,10 +4097,11 @@ function getAccountStats(account) {
   const monthTransactions = transactions.filter((tx) => tx.date.slice(0, 7) === monthKey);
   const income = transactions.filter((tx) => tx.type === 'income').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
   const expense = transactions.filter((tx) => tx.type === 'expense').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
-  const investment = transactions.filter((tx) => tx.type === 'investment').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const investmentDeposit = transactions.filter((tx) => tx.type === 'investment' || tx.type === 'investment_deposit').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
+  const investmentWithdrawal = transactions.filter((tx) => tx.type === 'investment_withdrawal').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
   const monthExpense = monthTransactions.filter((tx) => tx.type === 'expense').reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
   const monthVolume = monthTransactions.reduce((sum, tx) => finance.addMoney(sum, tx.amount), 0);
-  const calculatedBalance = finance.subtractMoney(finance.addMoney(account.initialBalance || 0, income), expense, investment);
+  const calculatedBalance = finance.addMoney(finance.subtractMoney(finance.addMoney(account.initialBalance || 0, income), expense, investmentDeposit), investmentWithdrawal);
   return {
     balance: account.manualBalance !== null && account.manualBalance !== undefined ? account.manualBalance : calculatedBalance,
     monthExpense,
@@ -3796,8 +4131,63 @@ function getPaymentSourceSummary() {
     creditCards: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'expense' && getAccountById(tx.financialAccountId)?.type === 'credit_card'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name)),
     accounts: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'expense'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name)),
     incomeAccounts: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'income'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name)),
-    investmentAccounts: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => tx.type === 'investment'), (tx) => getAccountById(tx.financialAccountId)?.nickname || getAccountById(tx.financialAccountId)?.name))
+    investmentAccounts: sortedAmounts(groupByLabel(monthTransactions.filter((tx) => isInvestmentTransactionType(tx.type)), (tx) => getInvestmentAccountById(tx.investmentAccountId)?.nickname || getInvestmentAccountById(tx.investmentAccountId)?.name))
   };
+}
+
+function getInvestmentDistribution() {
+  const accounts = Array.isArray(state.investmentAccounts) ? state.investmentAccounts : [];
+  const rows = accounts.map((account) => {
+    const institution = getInstitutionById(account.institutionId);
+    const amount = finance.computeInvestmentAccountBalance(account, state.transactions);
+    return {
+      id: account.id,
+      label: account.nickname || account.name || 'Cofrinho',
+      detail: institution?.name || getInvestmentTypeLabel(account.investmentType),
+      amount,
+      color: institution?.brandColor || account.color || designColors.accent
+    };
+  }).filter((item) => item.amount > 0);
+
+  if (accounts.length > 0) {
+    const total = rows.reduce((sum, item) => finance.addMoney(sum, item.amount), 0);
+    return rows
+      .map((item) => ({ ...item, total }))
+      .sort((a, b) => b.amount - a.amount);
+  }
+
+  const assignedIds = new Set(accounts.map((account) => String(account.id || '')));
+  const unassigned = finance.getInvestmentLedgerBalance((state.transactions || []).filter((tx) => {
+    const id = String(tx?.investmentAccountId || '');
+    return isInvestmentTransactionType(tx?.type) && (!id || !assignedIds.has(id));
+  }));
+
+  if (unassigned > 0) {
+    rows.push({
+      id: 'unassigned',
+      label: 'Sem cofrinho',
+      detail: 'Movimentações sem destino',
+      amount: unassigned,
+      color: designColors.info
+    });
+  }
+
+  const total = rows.reduce((sum, item) => finance.addMoney(sum, item.amount), 0);
+  return rows
+    .map((item) => ({ ...item, total }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function getInvestmentTypeLabel(type) {
+  return {
+    stock: 'Ações',
+    crypto: 'Criptomoedas',
+    reits: 'Fundos imobiliários',
+    fixed_income: 'Renda fixa',
+    fund: 'Fundos',
+    pension: 'Previdência',
+    other: 'Outro'
+  }[type] || 'Cofrinho/investimento';
 }
 
 function getTopAccountForDashboard() {
@@ -3859,14 +4249,22 @@ function valueOf(key, fallback) {
 function filterTransactions(filters) {
   return getSortedTransactions().filter((tx) => {
     const account = getAccountById(tx.financialAccountId);
-    if (filters.type !== 'all' && tx.type !== filters.type) return false;
+    const investmentAccount = getInvestmentAccountById(tx.investmentAccountId);
+    const institution = getInstitutionById(account?.institutionId || investmentAccount?.institutionId);
+    if (filters.type !== 'all') {
+      if (filters.type === 'investment') {
+        if (!isInvestmentTransactionType(tx.type)) return false;
+      } else if (tx.type !== filters.type) {
+        return false;
+      }
+    }
     if (filters.recurring === 'recurring' && !tx.recurring) return false;
     if (filters.recurring === 'single' && tx.recurring) return false;
     if (filters.financialAccountId && filters.financialAccountId !== 'all' && tx.financialAccountId !== filters.financialAccountId) return false;
-    if (filters.institutionId && filters.institutionId !== 'all' && account?.institutionId !== filters.institutionId) return false;
+    if (filters.institutionId && filters.institutionId !== 'all' && institution?.id !== filters.institutionId) return false;
     if (filters.paymentMethodId && filters.paymentMethodId !== 'all' && tx.paymentMethodId !== filters.paymentMethodId) return false;
     if (filters.cardBrand && filters.cardBrand !== 'all' && account?.cardBrand !== filters.cardBrand) return false;
-    if (filters.search && !`${tx.description} ${tx.category} ${account?.nickname || ''} ${getInstitutionById(account?.institutionId)?.name || ''} ${getPaymentMethodById(tx.paymentMethodId)?.name || ''}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.search && !`${tx.description} ${tx.category} ${account?.nickname || ''} ${investmentAccount?.nickname || ''} ${institution?.name || ''} ${getPaymentMethodById(tx.paymentMethodId)?.name || ''}`.toLowerCase().includes(filters.search.toLowerCase())) return false;
     if (filters.month && tx.date.slice(0, 7) !== filters.month) return false;
     return true;
   });
@@ -3997,7 +4395,7 @@ function getCalendarItemsForDate(date) {
       title: tx.description,
       amount: tx.amount,
       category: tx.category,
-      typeLabel: tx.type === 'income' ? 'Receita' : tx.type === 'investment' ? 'Investimento' : 'Despesa',
+      typeLabel: getTypeMeta(tx.type).label,
       tone: tx.type,
       status: 'realized'
     });
@@ -4086,7 +4484,7 @@ function sumAmount(items) {
 }
 
 function getReportInsights() {
-  const position = finance.computeFinancialPosition(state.transactions, new Date());
+  const position = finance.computeFinancialPosition(state.transactions, new Date(), state.investmentAccounts);
   const monthly = position.monthly;
   const monthlyNet = monthly.netCashFlow;
   const expenseByCategory = getExpenseCategoriesForCurrentMonth();
@@ -4112,7 +4510,7 @@ function getExpenseCategoriesForCurrentMonth() {
 }
 
 function buildFinancialInsights() {
-  const position = finance.computeFinancialPosition(state.transactions, new Date());
+  const position = finance.computeFinancialPosition(state.transactions, new Date(), state.investmentAccounts);
   const comparison = finance.compareMonths(state.transactions, new Date());
   const expenses = getExpenseCategoriesForCurrentMonth();
   const top = finance.getTopCategory(expenses);
@@ -4149,7 +4547,7 @@ function buildFinancialInsights() {
     tone: position.monthly.netCashFlow >= 0 ? 'success' : 'danger',
     label: 'Caixa',
     title: position.monthly.netCashFlow >= 0 ? 'Saldo líquido positivo' : 'Saldo líquido negativo',
-    description: `Receitas - despesas - investimentos = ${currency.format(position.monthly.netCashFlow)}.`
+    description: `Receitas - despesas - aportes + resgates = ${currency.format(position.monthly.netCashFlow)}.`
   });
 
   return insights;
@@ -4195,7 +4593,7 @@ function buildAlerts() {
     });
   }
 
-  if (monthly.income > 0 && (monthly.expense + monthly.investment) / monthly.income < 0.75) {
+  if (monthly.income > 0 && (monthly.expense + monthly.investmentDeposit) / monthly.income < 0.75) {
     alerts.push({
       tone: 'success',
       label: 'Oportunidade',
@@ -4218,77 +4616,123 @@ function buildAlerts() {
   return alerts;
 }
 
+function renderInvestmentCharts() {
+  const canvas = document.getElementById('investmentAllocationChart');
+  if (!canvas) return;
+  const distribution = getInvestmentDistribution();
+  charts.investmentAllocation = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: distribution.length ? distribution.map((item) => item.label) : ['Sem dados'],
+      datasets: [{
+        data: distribution.length ? distribution.map((item) => item.amount) : [1],
+        backgroundColor: distribution.length ? distribution.map((item) => item.color) : ['rgba(139,124,246,.58)'],
+        borderColor: '#0b1220',
+        borderWidth: 3,
+        hoverOffset: 3
+      }]
+    },
+    options: doughnutChartOptions(distribution.map((item) => item.amount))
+  });
+  finalizeChart(charts.investmentAllocation);
+}
+
 function renderDashboardChart() {
   const canvas = document.getElementById('dashboardFlowChart');
-  if (!canvas) return;
+  const allocationCanvas = document.getElementById('dashboardAllocationChart');
 
   const lastSixMonths = getLastMonths(6);
   const datasets = {
     labels: lastSixMonths.map((date) => date.toLocaleDateString('pt-BR', { month: 'short' })),
-    income: [],
-    expense: [],
-    investment: []
+    available: [],
+    invested: [],
+    netWorth: []
   };
 
   lastSixMonths.forEach((date) => {
-    const summary = getMonthlySummary(date);
-    datasets.income.push(summary.income);
-    datasets.expense.push(summary.expense);
-    datasets.investment.push(summary.investment);
+    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const transactionsUntilMonth = (state.transactions || []).filter((tx) => parseLocalDate(tx.date) <= monthEnd);
+    const position = finance.computeFinancialPosition(transactionsUntilMonth, date, state.investmentAccounts);
+    datasets.available.push(position.availableBalance);
+    datasets.invested.push(position.investedBalance);
+    datasets.netWorth.push(position.netWorth);
   });
 
-  charts.dashboard = new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels: datasets.labels,
-      datasets: [
-        {
-          label: 'Receitas',
-          data: datasets.income,
-          borderColor: designColors.success,
-          backgroundColor: designColors.successSoft,
-          pointBackgroundColor: designColors.success,
-          pointBorderColor: designColors.success,
-          fill: true,
-          tension: 0.35
-        },
-        {
-          label: 'Despesas',
-          data: datasets.expense,
-          borderColor: designColors.danger,
-          backgroundColor: designColors.dangerSoft,
-          pointBackgroundColor: designColors.danger,
-          pointBorderColor: designColors.danger,
-          fill: true,
-          tension: 0.35
-        },
-        {
-          label: 'Investimentos',
-          data: datasets.investment,
-          borderColor: designColors.accent,
-          backgroundColor: designColors.accentSoft,
-          pointBackgroundColor: designColors.accent,
-          pointBorderColor: designColors.accent,
-          fill: true,
-          tension: 0.35
-        }
-      ]
-    },
-    options: chartBaseOptions()
-  });
-  finalizeChart(charts.dashboard);
+  if (canvas) {
+    charts.dashboard = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: datasets.labels,
+        datasets: [
+          {
+            label: 'Patrimônio',
+            data: datasets.netWorth,
+            borderColor: designColors.success,
+            backgroundColor: designColors.successSoft,
+            pointBackgroundColor: designColors.success,
+            pointBorderColor: designColors.success,
+            fill: true,
+            tension: 0.42
+          },
+          {
+            label: 'Saldo disponível',
+            data: datasets.available,
+            borderColor: designColors.info,
+            backgroundColor: designColors.infoSoft,
+            pointBackgroundColor: designColors.info,
+            pointBorderColor: designColors.info,
+            fill: true,
+            tension: 0.42
+          },
+          {
+            label: 'Cofrinhos',
+            data: datasets.invested,
+            borderColor: designColors.accent,
+            backgroundColor: designColors.accentSoft,
+            pointBackgroundColor: designColors.accent,
+            pointBorderColor: designColors.accent,
+            fill: true,
+            tension: 0.42
+          }
+        ]
+      },
+      options: chartBaseOptions()
+    });
+    finalizeChart(charts.dashboard);
+  }
+
+  if (allocationCanvas) {
+    const distribution = getInvestmentDistribution();
+    charts.dashboardAllocation = new Chart(allocationCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: distribution.length ? distribution.map((item) => item.label) : ['Sem dados'],
+        datasets: [{
+          data: distribution.length ? distribution.map((item) => item.amount) : [1],
+          backgroundColor: distribution.length ? distribution.map((item) => item.color) : ['rgba(139,124,246,.58)'],
+          borderColor: '#0b1220',
+          borderWidth: 3,
+          hoverOffset: 3
+        }]
+      },
+      options: doughnutChartOptions(distribution.map((item) => item.amount))
+    });
+    finalizeChart(charts.dashboardAllocation);
+  }
 }
 
 function renderReportCharts() {
   const categoryCanvas = document.getElementById('reportCategoryChart');
   const balanceCanvas = document.getElementById('reportBalanceChart');
-  if (!categoryCanvas || !balanceCanvas) return;
+  const incomeExpenseCanvas = document.getElementById('reportIncomeExpenseChart');
+  const investmentCanvas = document.getElementById('reportInvestmentChart');
 
   const categoryData = getExpenseCategoriesForCurrentMonth();
   const labels = Object.keys(categoryData);
   const values = Object.values(categoryData);
 
-  charts.reportCategory = new Chart(categoryCanvas, {
+  if (categoryCanvas) {
+    charts.reportCategory = new Chart(categoryCanvas, {
     type: 'doughnut',
     data: {
       labels: labels.length ? labels : ['Sem dados'],
@@ -4308,31 +4752,80 @@ function renderReportCharts() {
       }]
     },
     options: doughnutChartOptions(values)
-  });
-  finalizeChart(charts.reportCategory);
+    });
+    finalizeChart(charts.reportCategory);
+  }
 
   const months = getLastMonths(6);
   const balances = months.map((date) => {
     const summary = getMonthlySummary(date);
-    return summary.income - summary.expense - summary.investment;
+    return summary.netCashFlow;
   });
 
-  charts.reportBalance = new Chart(balanceCanvas, {
-    type: 'bar',
-    data: {
-      labels: months.map((date) => date.toLocaleDateString('pt-BR', { month: 'short' })),
-      datasets: [{
-        label: 'Saldo mensal',
-        data: balances,
-        backgroundColor: balances.map((value) => value >= 0 ? 'rgba(52,211,153,.70)' : 'rgba(251,113,133,.70)'),
-        borderColor: balances.map((value) => value >= 0 ? 'rgba(52,211,153,.95)' : 'rgba(251,113,133,.95)'),
-        borderWidth: 1,
-        borderRadius: 8
-      }]
-    },
-    options: chartBaseOptions()
-  });
-  finalizeChart(charts.reportBalance);
+  if (balanceCanvas) {
+    charts.reportBalance = new Chart(balanceCanvas, {
+      type: 'bar',
+      data: {
+        labels: months.map((date) => date.toLocaleDateString('pt-BR', { month: 'short' })),
+        datasets: [{
+          label: 'Saldo mensal',
+          data: balances,
+          backgroundColor: balances.map((value) => value >= 0 ? 'rgba(52,211,153,.70)' : 'rgba(251,113,133,.70)'),
+          borderColor: balances.map((value) => value >= 0 ? 'rgba(52,211,153,.95)' : 'rgba(251,113,133,.95)'),
+          borderWidth: 1,
+          borderRadius: 8
+        }]
+      },
+      options: chartBaseOptions()
+    });
+    finalizeChart(charts.reportBalance);
+  }
+
+  if (incomeExpenseCanvas) {
+    charts.reportIncomeExpense = new Chart(incomeExpenseCanvas, {
+      type: 'bar',
+      data: {
+        labels: months.map((date) => date.toLocaleDateString('pt-BR', { month: 'short' })),
+        datasets: [
+          {
+            label: 'Receitas',
+            data: months.map((date) => getMonthlySummary(date).income),
+            backgroundColor: 'rgba(52,211,153,.64)',
+            borderRadius: 8
+          },
+          {
+            label: 'Despesas',
+            data: months.map((date) => getMonthlySummary(date).expense),
+            backgroundColor: 'rgba(251,113,133,.62)',
+            borderRadius: 8
+          }
+        ]
+      },
+      options: chartBaseOptions()
+    });
+    finalizeChart(charts.reportIncomeExpense);
+  }
+
+  if (investmentCanvas) {
+    const investmentValues = months.map((date) => getMonthlySummary(date).investmentVariation);
+    charts.reportInvestment = new Chart(investmentCanvas, {
+      type: 'line',
+      data: {
+        labels: months.map((date) => date.toLocaleDateString('pt-BR', { month: 'short' })),
+        datasets: [{
+          label: 'Rendimento líquido',
+          data: investmentValues,
+          borderColor: designColors.accent,
+          backgroundColor: designColors.accentSoft,
+          pointBackgroundColor: designColors.accent,
+          fill: true,
+          tension: 0.42
+        }]
+      },
+      options: chartBaseOptions()
+    });
+    finalizeChart(charts.reportInvestment);
+  }
 }
 
 function chartBaseOptions() {
@@ -4433,8 +4926,12 @@ function destroyCharts() {
   });
   charts = {
     dashboard: null,
+    dashboardAllocation: null,
+    investmentAllocation: null,
     reportCategory: null,
-    reportBalance: null
+    reportBalance: null,
+    reportIncomeExpense: null,
+    reportInvestment: null
   };
 }
 
